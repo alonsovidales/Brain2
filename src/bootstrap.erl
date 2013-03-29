@@ -9,8 +9,9 @@
 -export([
     start_node/0]).
 
--import(config_parser, [parse_file/2]).
--import(logging, [init/1]).
+-import(config_parser).
+-import(logging).
+-import(data_controller).
 
 start_node() ->
     io:format("Loading config files~n"),
@@ -31,4 +32,10 @@ start_node() ->
         logging,
         spawn(logging, init, [Config])),
 
-    logging ! {add, self(), error, "This is a log line..."}.
+    register(
+        ringManager,
+        spawn(ring_manager, init, [Config])),
+
+    register(
+        main,
+        spawn(data_controller, init, [Config, init:get_argument(node_id)])).

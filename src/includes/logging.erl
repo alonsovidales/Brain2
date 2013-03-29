@@ -25,7 +25,7 @@ addLogLine(Log, Pid, Type, LogLine) ->
     case erlang:process_info(Pid, registered_name) of
         {registered_name, Name} ->
             Line = io_lib:format("~s ~s [modeule: ~s]: ~s ~n", [TimeAsStr, Type, Name, LogLine]);
-        NoName ->
+        _NoName ->
             Line = io_lib:format("~s ~s: ~s ~n", [TimeAsStr, Type, LogLine])
     end,
 
