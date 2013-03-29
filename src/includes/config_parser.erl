@@ -1,11 +1,10 @@
 %%
 %% This file try to parse a config file, and returns it as a dictionary
 %%
-%% @author Alonso Vidales <alonso.vidales@tras2.es>
-%% @since 2013-03-24
-%%
 
 -module(config_parser).
+
+-author('alonso.vidales@tras2.es').
 
 -export([
     parse_file/2]).
@@ -19,9 +18,10 @@
 %%
 parse_config_line(Line, Verbose) ->
     case re:split(Line, "[ *]", [{return, list}]) of
-        [Key, Value] ->
+        [Key, ValueRaw] ->
+            Value = re:replace(ValueRaw, "\n", "", [global, {return, list}]),
             if
-                Verbose -> io:format("Configuration param: Key: ~s Value: ~s", [Key, Value]);
+                Verbose -> io:format("Configuration param: Key: ~s Value: ~s~n", [Key, Value]);
                 true -> false
             end,
             FirstChar = string:substr(Key, 1, 1),
