@@ -15,8 +15,11 @@
 -import(data_volatile).
 -import(data_string).
 
-action_executor(Action, Handler, Key, Params, Redundance, NodeId, PidToConfirm, LoadFromPersistance) ->
-    if LoadFromPersistance == true ->
+action_executor(Action, Handler, Key, Params, Redundance, NodeId, PidToConfirm, RingComplete) ->
+    % This is the last iteration trying to load the key from memory on one of the nodes of the ring,
+    % and this is the node where the query was done. Load the data from the data warehouse, and try
+    % to do the action against the loaded data
+    if RingComplete == true ->
         Handler ! {self(), load, Key},
 
         receive
@@ -31,151 +34,116 @@ action_executor(Action, Handler, Key, Params, Redundance, NodeId, PidToConfirm, 
     Handler ! {self(), Action, Params},
 
     receive
+        % The data is not in memory on the local node, try to execute the action on the node at the right
         ko ->
             logging ! {add, self(), info, io_lib:format("No data found on node~s~n", [NodeId])},
             % Search on the rest of nodes of the Ring
-            ringManager ! {get, right},
+            ringManager ! {get, right, self()},
             receive
                 {ok, NodePid} ->
                     % Execute the action on the right node
-                    NodePid ! {ie, NodeId, Action, Handler, Key, Params, PidToConfirm};
+                    NodePid ! {ie, NodeId, Action, Handler, Key, Params, PidToConfirm, Redundance};
                 _NoNode ->
                     logging ! {add, self(), info, io_lib:format("No node at the right~n")}
                 after 100 ->
                     logging ! {add, self(), error, io_lib:format("Ring manager doesn't respond~n")}
             end;
 
+        % The data was found, return execute the action, and in case of a modification on the data,
+        % redundance it on the Redundance nodes at the right
         {ok, Result} ->
-            if PidToConfirm /= false ->
-                PidToConfirm ! {ok, Result}
-            end
+            PidToConfirm ! {ok, Result}
 
             %if (Redundance > 0) and (Action /= get) ->
-            %    ringManager ! {get, right},
+            %    ringManager ! {get, right, self()},
             %    receive
             %        {ok, NodePid} ->
             %            % Execute the action on the right node
-            %            NodePid ! {ir, NodeId, Action, Handler, Key, Params, Redundance - 1};
+            %            NodePid ! {ie, NodeId, redundance, Handler, Key, Params, false, Redundance - 1};
             %        _NoNode ->
             %            logging ! {add, self(), info, io_lib:format("No node at the right~n")};
-            %        after ?100 ->
+            %        after 100 ->
             %            logging ! {add, self(), error, io_lib:format("Ring manager doesn't respond~n")}
             %    end;
     end.
 
-listener_loop(Config, NodeId) ->
+%%
+%% This method will listen for incomming messages from the client, and on a new process will attend them
+%% Acts as an adapter of the different data type managers.
+%%
+listener_loop(Config, NodeId, OpsSec, Timestamp) ->
+    % Used to get stats of ops / sec, etc
+    {_Mega, TimestampSec, _Micro} = now(),
+    if
+        Timestamp == TimestampSec ->
+            NowOpsSec = OpsSec + 1;
+        true ->
+            NowOpsSec = 1
+    end,
+
     receive
         % Internal call to try to execute an action on the memory of one of the nodes
-        {ie, InNodeId, InAction, InHandler, InKey, InParams, InPidToConfirm} ->
+        {ie, InNodeId, InAction, InHandler, InKey, InParams, InPidToConfirm, InRedundance} ->
             spawn(data_controller, action_executor, [
                 InAction,
                 InHandler,
                 InKey,
                 InParams,
-                list_to_integer(dict:fetch("redundance", Config)),
+                InRedundance,
                 InNodeId,
                 InPidToConfirm,
-                InNodeId == NodeId]),
-            listener_loop(Config, NodeId),
-            ExecutorParams = false;
+                InNodeId == NodeId]);
 
-        % Internal call to keep the redundance, execute the action on the InRedundance - 1 next nodes
-        {ir, InNodeId, InAction, InHandler, InKey, InParams, InRedundance} ->
-            if InNodeId == NodeId ->
-                listener_loop(Config, NodeId)
-            end,
-            spawn(data_controller, action_executor, [
-                InAction,
-                InHandler,
-                InKey,
-                InParams,
-                InRedundance - 1,
-                InNodeId,
-                false,
-                false]),
-            listener_loop(Config, NodeId),
-            ExecutorParams = false;
+        % action_executor(Action, Handler, Key, Params, Redundance, NodeId, PidToConfirm, RingComplete) ->
+        {Pid, "get", Key, _Args} ->
+            Pid ! {ok, io_lib:format("This is a get!!!: ~s~n", [Key])};
 
-        {get, Key, Pid} ->
-            ExecutorParams = [get, Key, string_manager, Pid, []];
-        {set, Key, Value} ->
-            ExecutorParams = [set, Key, string_manager, false, [Value, false]];
-        {set, Key, Value, Persist} ->
-            ExecutorParams = [set, Key, string_manager, false, [Value, Persist]];
-        {set, Key, Value, Persist, Pid} ->
-            ExecutorParams = [set, Key, string_manager, Pid, [Value, Persist]];
-        {del, Key} ->
-            ExecutorParams = [del, Key, string_manager, false, []];
-        {del, Key, Pid} ->
-            ExecutorParams = [del, Key, string_manager, Pid, []];
-
-        {vget, Key, Pid} ->
-            ExecutorParams = [get, Key, volatile_manager, Pid, []];
-        {vset, Key, Value, Ttl} ->
-            ExecutorParams = [set, Key, volatile_manager, false, [Value, Ttl]];
-        {vdel, Key} ->
-            ExecutorParams = [del, Key, volatile_manager, false, []];
-
-        {hget, Key, IntKeys, Pid} ->
-            ExecutorParams = [get, Key, hash_manager, Pid, [IntKeys]];
-        {hget, Key, Pid} ->
-            ExecutorParams = [get, Key, hash_manager, Pid, [all]];
-        {hset, Key, IntKeyValues} ->
-            ExecutorParams = [set, Key, hash_manager, false, [IntKeyValues, false]];
-        {hset, Key, IntKeyValues, Persist} ->
-            ExecutorParams = [set, Key, hash_manager, false, [IntKeyValues, Persist]];
-        {hset, Key, IntKeyValues, Persist, Pid} ->
-            ExecutorParams = [set, Key, hash_manager, Pid, [IntKeyValues, Persist]];
-        {hdelall, Key} ->
-            ExecutorParams = [del, Key, hash_manager, false, [all]];
-        {hdelall, Key, Pid} ->
-            ExecutorParams = [del, Key, hash_manager, Pid, [all, true]];
-        {hdelall, Key, Pid, Persist} ->
-            ExecutorParams = [del, Key, hash_manager, Pid, [all, Persist]];
-        {hdel, Key, IntKeys} ->
-            ExecutorParams = [del, Key, hash_manager, false, [IntKeys, false]];
-        {hdel, Key, IntKeys, Persist} ->
-            ExecutorParams = [del, Key, hash_manager, false, [IntKeys, Persist]];
-        {hdel, Key, IntKeys, Persist, Pid} ->
-            ExecutorParams = [del, Key, hash_manager, Pid, [IntKeys, Persist]];
+        {checkAlive, Pid} ->
+            Pid ! ok;
 
         {persistAll} ->
             hash_manager ! {persistAll, false},
-            string_manager ! {persistAll, false},
-            listener_loop(Config, NodeId),
-            ExecutorParams = false;
+            string_manager ! {persistAll, false};
 
         {persistAndFlushAll} ->
             hash_manager ! {persistAll, true},
-            string_manager ! {persistAll, true},
-            listener_loop(Config, NodeId),
-            ExecutorParams = false;
+            string_manager ! {persistAll, true};
 
         {flushAll} ->
             hash_manager ! {flushAll},
-            string_manager ! {flushAll},
-            listener_loop(Config, NodeId),
-            ExecutorParams = false;
+            string_manager ! {flushAll};
+
+        {getStats, Pid} ->
+            hash_manager ! {getStats, self()},
+            receive
+                {ok, HashStatsInfo} ->
+                    HashStats = HashStatsInfo;
+                ko ->
+                    HashStats = error
+            end,
+
+            string_manager ! {getStats, self()},
+            receive
+                {ok, StringStatsInfo} ->
+                    StringStats = StringStatsInfo;
+                ko ->
+                    StringStats = error
+            end,
+
+            volatile_manager ! {getStats, self()},
+            receive
+                {ok, VolatileStatsInfo} ->
+                    VolatileStats = VolatileStatsInfo;
+                ko ->
+                    VolatileStats = error
+            end,
+            Pid ! {ok, {NowOpsSec, HashStats, StringStats, VolatileStats}};
 
         Error ->
-            logging ! {add, self(), error, io_lib:format("Commad not recognise~p~n", [Error])},
-            listener_loop(Config, NodeId),
-            ExecutorParams = false
+            logging ! {add, self(), error, io_lib:format("Commad not recognise~p~n", [Error])}
     end,
-   
-    [ExAction, ExKey, ExHandler, ExPidToConfirm, ExParams] = ExecutorParams,
-    % Launch a new process to execute the action async, this kind of actions can take too much time
-    spawn(data_controller, action_executor, [
-        ExAction,
-        ExHandler,
-        ExKey,
-        ExParams,
-        list_to_integer(dict:fetch("redundance", Config)),
-        NodeId,
-        ExPidToConfirm,
-        false]),
 
-    listener_loop(Config, NodeId).
+    listener_loop(Config, NodeId, NowOpsSec, TimestampSec).
 
 init(Config, NodeId) ->
     register(
@@ -190,4 +158,4 @@ init(Config, NodeId) ->
         string_manager,
         spawn(data_string, init, [Config])),
 
-    listener_loop(Config, NodeId).
+    listener_loop(Config, NodeId, 0, 0).

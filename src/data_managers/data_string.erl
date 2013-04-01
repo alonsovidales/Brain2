@@ -122,6 +122,9 @@ listener_loop(Config) ->
             end,
             listener_loop(Config);
 
+        {getStats, Pid} ->
+            Pid ! {stringStatsTODO};
+
         {persistAll, Flush} ->
             TODO = 1;
         {flushAll} ->

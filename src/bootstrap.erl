@@ -11,6 +11,7 @@
 
 -import(config_parser).
 -import(logging).
+-import(ring_controller).
 -import(data_controller).
 
 start_node() ->
@@ -28,14 +29,21 @@ start_node() ->
             Config = config_parser:parse_file(ConfigFiles, false)
     end,
 
-    register(
-        logging,
-        spawn(logging, init, [Config])),
+    case init:get_argument(node_id) of
+        {ok, [[NodeId]]} ->
+            register(
+                logging,
+                spawn_link(logging, init, [Config])),
 
-    register(
-        ringManager,
-        spawn(ring_manager, init, [Config])),
+            register(
+                data_controller,
+                spawn_link(data_controller, init, [Config, NodeId])),
 
-    register(
-        main,
-        spawn(data_controller, init, [Config, init:get_argument(node_id)])).
+            register(
+                ringManager,
+                spawn_link(ring_controller, init, [Config, NodeId])),
+
+            server_controller:init(Config);
+        true ->
+            io:format("Error: Use the parameter -node_id <node_id> to specify a unique identifier for this node")
+    end.
