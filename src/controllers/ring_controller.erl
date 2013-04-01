@@ -11,7 +11,7 @@
     init/2]).
 
 get_node_pos(NodeId, [], _CurrentPos) ->
-    logging ! {add, self(), error, io_lib:format("Node not found in list from managers: ~p ~n", [NodeId])},
+    logging ! {add, self(), error, io_lib:format("Node not found on list from managers: ~p ~n", [NodeId])},
     false;
 
 get_node_pos(NodeId, [{CurrentNodeId, _Pid} | Rest], CurrentPos) ->
@@ -58,9 +58,9 @@ listener_loop(NodeId, LeftNode, RightNode) ->
         {get, Way, Pid} ->
             case Way of
                 right ->
-                    Pid ! RightNode;
+                    Pid ! {ok, RightNode};
                 left ->
-                    Pid ! LeftNode
+                    Pid ! {ok, LeftNode}
             end;
 
         % NodesList is a list of {<nodeId>, <Pid>} for each node
@@ -116,7 +116,7 @@ convert_to_managers_list([], ManagersList) ->
     ManagersList;
 
 convert_to_managers_list([Manager | Rest], ManagersList) ->
-    io:format("Managers: ~p ~p ~n" , [ManagersList, {manager, list_to_atom(string:concat("manager@", Manager))}]),
+    %io:format("Managers: ~p ~p ~n" , [ManagersList, {manager, list_to_atom(string:concat("manager@", Manager))}]),
     convert_to_managers_list(Rest, ManagersList ++ [{manager, list_to_atom(string:concat("manager@", Manager))}]).
 
 convert_to_managers_list(Managers) ->
@@ -129,4 +129,4 @@ init(Config, NodeId) ->
     % Register this node on all the available managers
     register_node(ManagersPids, NodeId),
 
-    listener_loop(NodeId, false, false).
+    listener_loop(NodeId, data_controller, data_controller).

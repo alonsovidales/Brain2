@@ -19,19 +19,29 @@ action_executor(Action, Handler, Key, Params, Redundance, NodeId, PidToConfirm, 
     % This is the last iteration trying to load the key from memory on one of the nodes of the ring,
     % and this is the node where the query was done. Load the data from the data warehouse, and try
     % to do the action against the loaded data
-    if RingComplete == true ->
-        Handler ! {self(), load, Key},
+    if 
+        RingComplete ->
+            io:format("Ring complete, try to load...~n", []),
+            Handler ! {self(), load, Key},
 
-        receive
-            ko ->
-                throw(io_lib:format("Problem trying to load key ~s from Warehouse~n", [Key]));
-            ok ->
-                logging ! {add, self(), info, io_lib:format("Loaded key ~s from Warehouse~n", [Key])}
-        end
+            receive
+                ko ->
+                    throw(io_lib:format("Problem trying to load key ~s from Warehouse~n", [Key]));
+                ok ->
+                    logging ! {add, self(), info, io_lib:format("Loaded key ~s from Warehouse~n", [Key])}
+            end;
+        true ->
+            false
     end,
 
     % Try to execute the action on memory only
-    Handler ! {self(), Action, Params},
+    if
+        length(Params) == 0 ->
+            io:format("No args: ~p Handler: ~p~n", [Params, Handler]),
+            Handler ! {self(), Action, Key};
+        true ->
+            Handler ! {self(), Action, Key, Params}
+    end,
 
     receive
         % The data is not in memory on the local node, try to execute the action on the node at the right
@@ -42,6 +52,7 @@ action_executor(Action, Handler, Key, Params, Redundance, NodeId, PidToConfirm, 
             receive
                 {ok, NodePid} ->
                     % Execute the action on the right node
+                    io:format("Executing on the right node, NodePid: ~p Params: ~p~n", [NodePid, {ie, NodeId, Action, Handler, Key, Params, PidToConfirm, Redundance}]),
                     NodePid ! {ie, NodeId, Action, Handler, Key, Params, PidToConfirm, Redundance};
                 _NoNode ->
                     logging ! {add, self(), info, io_lib:format("No node at the right~n")}
@@ -71,7 +82,7 @@ action_executor(Action, Handler, Key, Params, Redundance, NodeId, PidToConfirm, 
 %% This method will listen for incomming messages from the client, and on a new process will attend them
 %% Acts as an adapter of the different data type managers.
 %%
-listener_loop(Config, NodeId, OpsSec, Timestamp) ->
+listener_loop(Redundance, NodeId, OpsSec, Timestamp) ->
     % Used to get stats of ops / sec, etc
     {_Mega, TimestampSec, _Micro} = now(),
     if
@@ -94,9 +105,35 @@ listener_loop(Config, NodeId, OpsSec, Timestamp) ->
                 InPidToConfirm,
                 InNodeId == NodeId]);
 
-        % action_executor(Action, Handler, Key, Params, Redundance, NodeId, PidToConfirm, RingComplete) ->
-        {Pid, "get", Key, _Args} ->
-            Pid ! {ok, io_lib:format("This is a get!!!: ~s~n", [Key])};
+        {Pid, "get", Key} ->
+            spawn(
+                data_controller,
+                action_executor,
+                [get, string_manager, Key, [], Redundance, NodeId, Pid, false]);
+
+        {Pid, "set", Key, Value} ->
+            spawn(
+                data_controller,
+                action_executor,
+                [set, string_manager, Key, [Value, false], Redundance, NodeId, Pid, false]);
+
+        {Pid, "pset", Key, Value} ->
+            spawn(
+                data_controller,
+                action_executor,
+                [set, string_manager, Key, [Value, true], Redundance, NodeId, Pid, false]);
+
+        {Pid, "del", Key} ->
+            spawn(
+                data_controller,
+                action_executor,
+                [del, string_manager, Key, [], Redundance, NodeId, Pid, false]);
+
+        {Pid, "pdel", Key} ->
+            spawn(
+                data_controller,
+                action_executor,
+                [del, string_manager, Key, [], Redundance, NodeId, Pid, false]);
 
         {checkAlive, Pid} ->
             Pid ! ok;
@@ -143,7 +180,7 @@ listener_loop(Config, NodeId, OpsSec, Timestamp) ->
             logging ! {add, self(), error, io_lib:format("Commad not recognise~p~n", [Error])}
     end,
 
-    listener_loop(Config, NodeId, NowOpsSec, TimestampSec).
+    listener_loop(Redundance, NodeId, NowOpsSec, TimestampSec).
 
 init(Config, NodeId) ->
     register(
@@ -158,4 +195,8 @@ init(Config, NodeId) ->
         string_manager,
         spawn(data_string, init, [Config])),
 
-    listener_loop(Config, NodeId, 0, 0).
+    listener_loop(
+        list_to_integer(dict:fetch("redundance", Config)),
+        NodeId,
+        0,
+        0).

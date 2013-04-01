@@ -7,27 +7,31 @@
 -author('alonso.vidales@tras2.es').
 
 -export([
-    start_node/0]).
+    start_node/0,
+    start_manager/0]).
 
 -import(config_parser).
 -import(logging).
 -import(ring_controller).
 -import(data_controller).
+-import(manager_controller).
 
-start_node() ->
-    io:format("Loading config files~n"),
+get_config(Verbose) ->
     ConfigFiles = [
         "etc/brain_node.conf",
         "/etc/brain/brain_node.conf",
         "/etc/brain_node.conf"],
 
-    io:format("Parsing config~n"),
-    case init:get_argument(verbose) of
+    case Verbose of
         {ok, [["true"]]} ->
-            Config = config_parser:parse_file(ConfigFiles, true);
+            config_parser:parse_file(ConfigFiles, true);
         _Default ->
-            Config = config_parser:parse_file(ConfigFiles, false)
-    end,
+            config_parser:parse_file(ConfigFiles, false)
+    end.
+
+
+start_node() ->
+    Config = get_config(init:get_argument(verbose)),
 
     case init:get_argument(node_id) of
         {ok, [[NodeId]]} ->
@@ -43,7 +47,16 @@ start_node() ->
                 ringManager,
                 spawn_link(ring_controller, init, [Config, NodeId])),
 
-            server_controller:init(Config);
-        true ->
+            server_controller:init(Config, init:get_argument(port));
+                
+        _Error ->
             io:format("Error: Use the parameter -node_id <node_id> to specify a unique identifier for this node")
     end.
+
+start_manager() ->
+    Config = get_config(init:get_argument(verbose)),
+    register(
+        logging,
+        spawn_link(logging, init, [Config])),
+
+    manager_controller:init(Config).

@@ -21,14 +21,14 @@ warehouse_del(Key) ->
 
 handler_listener(Ttl, Key, Value) ->
     receive
-        {Pid, get} ->
+        {Pid, get, Key} ->
+            io:format("GETTING on handler!!!!: ~p~n", [Key]),
             Pid ! {ok, Value},
             handler_listener(Ttl, Key, Value);
 
         {Pid, set, NewValue} ->
-            if Pid /= false ->
-                Pid ! ok
-            end,
+            io:format("Setting value: ~s~n", [NewValue]),
+            Pid ! {ok, "1"},
             handler_listener(Ttl, Key, NewValue);
 
         {Pid, persist} ->
@@ -37,9 +37,7 @@ handler_listener(Ttl, Key, Value) ->
                 logging ! {add, self(), error, io_lib:format("Problem trying to persist the key ~s~n", [Key])}
             end,
 
-            if Pid /= false ->
-                Pid ! Result
-            end,
+            Pid ! {ok, Result},
             handler_listener(Ttl, Key, Value);
 
         Error ->
@@ -72,12 +70,12 @@ get_handler(Key) ->
 
 listener_loop(Config) ->
     receive
-        {Pid, get, Key, _Params} ->
+        {Pid, get, Key} ->
             case get_handler(Key) of
                 undefined ->
                     Pid ! ko;
                 Handler when is_pid(Handler) ->
-                    Handler ! {Pid, get}
+                    Handler ! {Pid, get, Key}
             end,
             listener_loop(Config);
 
@@ -85,7 +83,7 @@ listener_loop(Config) ->
             case get_handler(Key) of
                 undefined -> Pid ! ko;
                 Handler when is_pid(Handler) ->
-                    if Persist == true ->
+                    if Persist ->
                         Handler ! {false, set},
                         Handler ! {Pid, persist};
                     true ->
@@ -94,7 +92,7 @@ listener_loop(Config) ->
             end,
             listener_loop(Config);
 
-        {Pid, del, Key, [Persist]} ->
+        {Pid, del, Key, Persist} ->
             case get_handler(Key) of
                 undefined -> Pid ! ko;
                 Handler when is_pid(Handler) ->
@@ -127,11 +125,12 @@ listener_loop(Config) ->
 
         {persistAll, Flush} ->
             TODO = 1;
+
         {flushAll} ->
             TODO = 1;
             
         Error ->
-            logging ! {add, self(), error, io_lib:format("Commad not recognise~p~n", [Error])}
+            logging ! {add, self(), error, io_lib:format("Commad not recognise ~p~n", [Error])}
     end.
 
 init(Config) ->

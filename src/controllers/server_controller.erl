@@ -8,13 +8,26 @@
 -author('alonso.vidales@tras2.es').
 
 -export([
-    init/1]).
+    init/2]).
 
 process_command(Command, TimeOut) ->
     % Remove the \r\n at the end of the line added by the client
     StripCommand = string:strip(string:substr(Command, 1, string:len(Command) - 2), left),
 
     case re:split(StripCommand, " +", [{return, list}, {parts, 3}]) of
+        [Action, Key] ->
+            data_controller ! {self(), Action, Key},
+            receive
+                {ok, Result} ->
+                    Result;
+                {ko, Error} ->
+                    logging ! {add, self(), error, io_lib:format("Request error: ~p ~n", [Error])},
+                    io_lib:format("Request error: ~p ~n", [Error])
+
+                after TimeOut ->
+                    io_lib:format("Max execution time exceeded ~p ~n", [TimeOut])
+            end;
+                    
         [Action, Key, Args] ->
             data_controller ! {self(), Action, Key, Args},
             receive
@@ -28,8 +41,9 @@ process_command(Command, TimeOut) ->
                     io_lib:format("Max execution time exceeded ~p ~n", [TimeOut])
             end;
                     
-        _Error ->
-            io_lib:format("Problem parsing the input~n")
+        Error ->
+            logging ! {add, self(), error, io_lib:format("Problem parsing the input: ~p ~n", [Error])},
+            io_lib:format("Problem parsing the input ~p ~n", [Error])
     end.
 
 handle(MainPid, Socket, TimeOut) ->
@@ -69,17 +83,32 @@ sleep_until_shutdown() ->
             sleep_until_shutdown()
     end.
 
-init(Config) ->
-    io:format("Starting server on port: ~s ...~n", [dict:fetch("server_port", Config)]),
-    
+init(Config, DefPort) ->
+    Port = case DefPort of
+        {ok, [[PortNum]]} ->
+            list_to_integer(PortNum);
+        _NoDefined ->
+            list_to_integer(dict:fetch("server_port", Config))
+    end,
+
+    io:format("Starting server on port: ~p ...~n", [Port]),
+   
     case gen_tcp:listen(
-        list_to_integer(dict:fetch("server_port", Config)),
+        Port,
         [
             list,
             {active, false}
         ]) of
         {ok, Listen} ->
-            logging ! {add, self(), info, io_lib:format("Server listening on port: ~s~n", [dict:fetch("server_port", Config)])},
+            io:format("~n", []),
+            io:format(" '||'''|,~n", []),
+            io:format("  ||   ||                  ''~n", []),
+            io:format("  ||;;;;   '||''|  '''|.   ||  `||''|,~n", []),
+            io:format("  ||   ||   ||    .|''||   ||   ||  ||~n", []),
+            io:format(" .||...|'  .||.   `|..||. .||. .||  ||.~n~n", []),
+            io:format("Author: Alonso Vidales <alonso.vidales@tras2.es>~n", []),
+            io:format("Node ready and listening on port: ~p~n", [Port]),
+            logging ! {add, self(), info, io_lib:format("Server listening on port: ~p~n", [Port])},
             acceptor(
                 self(),
                 Listen,
