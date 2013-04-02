@@ -15,12 +15,13 @@
 -import(ring_controller).
 -import(data_controller).
 -import(manager_controller).
+-import(ftp_manager).
 
 get_config(Verbose) ->
     ConfigFiles = [
-        "etc/brain_node.conf",
+        "/etc/brain_node.conf",
         "/etc/brain/brain_node.conf",
-        "/etc/brain_node.conf"],
+        "etc/brain_node.conf"],
 
     case Verbose of
         {ok, [["true"]]} ->
@@ -37,17 +38,27 @@ start_node() ->
         {ok, [[NodeId]]} ->
             register(
                 logging,
-                spawn_link(logging, init, [Config])),
+                spawn_link(logging, init, [Config, NodeId])),
 
-            register(
-                data_controller,
-                spawn_link(data_controller, init, [Config, NodeId])),
+            case dict:fetch("warehouse_manager", Config) of
+                "ftp" ->
+                    WarehouseStatus = ftp_manager:init(Config)
+            end,
 
-            register(
-                ringManager,
-                spawn_link(ring_controller, init, [Config, NodeId])),
+            case WarehouseStatus of
+                ko ->
+                    io:format("Trying to connect with warehouse server~n", []);
+                ok ->
+                    register(
+                        data_controller,
+                        spawn_link(data_controller, init, [Config, NodeId])),
 
-            server_controller:init(Config, init:get_argument(port));
+                    register(
+                        ringManager,
+                        spawn_link(ring_controller, init, [Config, NodeId])),
+
+                    server_controller:init(Config, init:get_argument(port))
+            end;
                 
         _Error ->
             io:format("Error: Use the parameter -node_id <node_id> to specify a unique identifier for this node")

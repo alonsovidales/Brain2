@@ -20,34 +20,34 @@ get_node_pos(NodeId, [{CurrentNodeId, _Pid} | Rest], CurrentPos) ->
         true -> get_node_pos(NodeId, Rest, CurrentPos + 1)
     end.
 
-get_left_right_nodes(NodeId, Nodes) ->
-    Pos = get_node_pos(NodeId, Nodes, 1),
+get_left_right_nodes(NodeId, NodesList) ->
+    Pos = get_node_pos(NodeId, NodesList, 1),
 
-    case length(Nodes) of
+    case length(NodesList) of
         1 ->
             Nodes = [data_controller, data_controller];
         2 ->
-            if
-                Pos == 1 ->
-                    {_NodeId, RightPid} = lists:nth(2, Nodes),
-                    Nodes = [data_controller, RightPid];
-                true ->
-                    {_NodeId, LeftPid} = lists:nth(1, Nodes),
-                    Nodes = [LeftPid, data_controller]
+            Nodes = case Pos of
+                1 ->
+                    {_NodeId, RightPid} = lists:nth(2, NodesList),
+                    [data_controller, RightPid];
+                _MoreThanOne ->
+                    {_NodeId, LeftPid} = lists:nth(1, NodesList),
+                    [LeftPid, data_controller]
             end;
-        true ->
+        _MoreThanTwo ->
             if
-                Pos == length(Nodes) ->
-                    {_NodeLeftId, LeftPid} = lists:nth(1, Nodes),
-                    {_NodeRightId, RightPid} = lists:nth(Pos - 1, Nodes);
+                Pos == length(NodesList) ->
+                    {_NodeLeftId, LeftPid} = lists:nth(1, NodesList),
+                    {_NodeRightId, RightPid} = lists:nth(Pos - 1, NodesList);
 
                 Pos == 1 ->
-                    {_NodeLeftId, LeftPid} = lists:nth(length(Nodes), Nodes),
-                    {_NodeRightId, RightPid} = lists:nth(2, Nodes);
+                    {_NodeLeftId, LeftPid} = lists:nth(length(NodesList), NodesList),
+                    {_NodeRightId, RightPid} = lists:nth(2, NodesList);
 
                 true ->
-                    {_NodeLeftId, LeftPid} = lists:nth(Pos - 1, Nodes),
-                    {_NodeRightId, RightPid} = lists:nth(Pos + 1, Nodes)
+                    {_NodeLeftId, LeftPid} = lists:nth(Pos - 1, NodesList),
+                    {_NodeRightId, RightPid} = lists:nth(Pos + 1, NodesList)
             end,
             Nodes = [LeftPid, RightPid]
     end,
@@ -55,18 +55,18 @@ get_left_right_nodes(NodeId, Nodes) ->
 
 listener_loop(NodeId, LeftNode, RightNode) ->
     receive
-        {get, Way, Pid} ->
-            case Way of
-                right ->
-                    Pid ! {ok, RightNode};
-                left ->
-                    Pid ! {ok, LeftNode}
-            end;
+        {get, right, Pid} ->
+            Pid ! {ok, RightNode},
+            listener_loop(NodeId, LeftNode, RightNode);
+        {get, left, Pid} ->
+            Pid ! {ok, LeftNode},
+            listener_loop(NodeId, LeftNode, RightNode);
 
         % NodesList is a list of {<nodeId>, <Pid>} for each node
         {update, NodesList} ->
             [NewLeftNode, NewRightNode] = get_left_right_nodes(NodeId, NodesList),
 
+            logging ! {add, self(), debug, io_lib:format("Nodes List: ~p ~n", [NodesList])},
             logging ! {add, self(), info, io_lib:format("Updating partner nodes Left: ~p Right: ~p ~n", [NewLeftNode, NewRightNode])},
             listener_loop(NodeId, NewLeftNode, NewRightNode);
 
@@ -76,7 +76,7 @@ listener_loop(NodeId, LeftNode, RightNode) ->
 
         {monitor, Pid} ->
             {Total, Allocated, Worst} = memsup:get_memory_data(),
-            data_controller ! {getStats, self()},
+            whereis(data_controller) ! {getStats, self()},
             receive
                 Stats ->
                     Pid ! {Total, Allocated, Worst, Stats}
@@ -94,7 +94,7 @@ register_node([], _NodeId) ->
     ok;
 
 register_node([Manager | Rest], NodeId) ->
-    Manager ! {register, NodeId, self(), manager},
+    Manager ! {register, NodeId, self(), whereis(data_controller)},
 
     receive
         ok ->
@@ -129,4 +129,4 @@ init(Config, NodeId) ->
     % Register this node on all the available managers
     register_node(ManagersPids, NodeId),
 
-    listener_loop(NodeId, data_controller, data_controller).
+    listener_loop(NodeId, whereis(data_controller), whereis(data_controller)).

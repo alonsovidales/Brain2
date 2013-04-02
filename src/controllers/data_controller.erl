@@ -16,6 +16,7 @@
 -import(data_string).
 
 action_executor(Action, Handler, Key, Params, Redundance, NodeId, PidToConfirm, RingComplete) ->
+    logging ! {add, self(), debug, io_lib:format("Executing action: ~p~n", [[Action, Handler, Key, Params, Redundance, NodeId, PidToConfirm, RingComplete]])},
     % This is the last iteration trying to load the key from memory on one of the nodes of the ring,
     % and this is the node where the query was done. Load the data from the data warehouse, and try
     % to do the action against the loaded data
@@ -37,7 +38,6 @@ action_executor(Action, Handler, Key, Params, Redundance, NodeId, PidToConfirm, 
     % Try to execute the action on memory only
     if
         length(Params) == 0 ->
-            io:format("No args: ~p Handler: ~p~n", [Params, Handler]),
             Handler ! {self(), Action, Key};
         true ->
             Handler ! {self(), Action, Key, Params}
@@ -46,13 +46,13 @@ action_executor(Action, Handler, Key, Params, Redundance, NodeId, PidToConfirm, 
     receive
         % The data is not in memory on the local node, try to execute the action on the node at the right
         ko ->
-            logging ! {add, self(), info, io_lib:format("No data found on node~s~n", [NodeId])},
+            logging ! {add, self(), info, io_lib:format("No data found on node: ~s~n", [NodeId])},
             % Search on the rest of nodes of the Ring
+            io:format("Manager: ~p , Values: ~p~n", [ringManager, {get, right, self()}]),
             ringManager ! {get, right, self()},
             receive
                 {ok, NodePid} ->
                     % Execute the action on the right node
-                    io:format("Executing on the right node, NodePid: ~p Params: ~p~n", [NodePid, {ie, NodeId, Action, Handler, Key, Params, PidToConfirm, Redundance}]),
                     NodePid ! {ie, NodeId, Action, Handler, Key, Params, PidToConfirm, Redundance};
                 _NoNode ->
                     logging ! {add, self(), info, io_lib:format("No node at the right~n")}
@@ -127,13 +127,13 @@ listener_loop(Redundance, NodeId, OpsSec, Timestamp) ->
             spawn(
                 data_controller,
                 action_executor,
-                [del, string_manager, Key, [], Redundance, NodeId, Pid, false]);
+                [set, string_manager, Key, [null, false], Redundance, NodeId, Pid, false]);
 
         {Pid, "pdel", Key} ->
             spawn(
                 data_controller,
                 action_executor,
-                [del, string_manager, Key, [], Redundance, NodeId, Pid, false]);
+                [set, string_manager, Key, [null, true], Redundance, NodeId, Pid, false]);
 
         {checkAlive, Pid} ->
             Pid ! ok;
@@ -149,6 +149,9 @@ listener_loop(Redundance, NodeId, OpsSec, Timestamp) ->
         {flushAll} ->
             hash_manager ! {flushAll},
             string_manager ! {flushAll};
+
+        {update, Nodes} ->
+            ringManager ! {update, Nodes};
 
         {getStats, Pid} ->
             hash_manager ! {getStats, self()},
