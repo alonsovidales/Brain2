@@ -158,6 +158,39 @@ listener_loop(Redundance, NodeId, OpsSec, Timestamp) ->
                 action_executor,
                 [set, volatile_manager, Key, [null], Redundance, NodeId, Pid, false]);
 
+        %%
+        %% Hash data type actions
+        %%
+        {Pid, "hget", Key} ->
+            spawn(
+                data_controller,
+                action_executor,
+                [get, data_hash, Key, [all], Redundance, NodeId, Pid, false]);
+
+        {Pid, "hget", Key, IntKeys} ->
+            spawn(
+                data_controller,
+                action_executor,
+                [get, data_hash, Key, [[string:tokens(IntKeys, ",")]], Redundance, NodeId, Pid, false]);
+
+        {Pid, "hsetkv", Key, IntKeyValue} ->
+            spawn(
+                data_controller,
+                action_executor,
+                [set, data_hash, Key, [re:split(IntKeyValue, " ", [{return, list}, {parts, 2}])], Redundance, NodeId, Pid, false]);
+
+        {Pid, "hdel", Key} ->
+            spawn(
+                data_controller,
+                action_executor,
+                [del, data_hash, Key, [all], Redundance, NodeId, Pid, false]);
+
+        {Pid, "hdel", Key, IntKeys} ->
+            spawn(
+                data_controller,
+                action_executor,
+                [del, data_hash, Key, [[string:tokens(IntKeys, ",")]], Redundance, NodeId, Pid, false]);
+
         {checkAlive, Pid} ->
             Pid ! ok;
 
