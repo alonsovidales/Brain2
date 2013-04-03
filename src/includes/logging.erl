@@ -45,7 +45,9 @@ startListenerLoop(Config, Log, NodeId) ->
             if
                 ((Mode == "production") and ((Type == error) or (Type == fatal))) or
                 (Mode == "debug") ->
-                    addLogLine(NodeId, Log, Pid, Type, LogLine)
+                    addLogLine(NodeId, Log, Pid, Type, LogLine);
+                true ->
+                    false
             end,
 
             startListenerLoop(Config, Log, NodeId)

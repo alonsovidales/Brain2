@@ -52,7 +52,9 @@ exec_action(Action, Pid, Host, Port, User, Pass, BaseDir, Key, Value) ->
                 Error ->
                     io:format("Doing logging on FTP server with user: ~p~nError: ~p~n", [User, Error]),
                     Pid ! ko
-            end;
+            end,
+
+            ftp:close(FtpPid);
 
         {error, Reason} ->
             io:format("Error opening connection with FTP server \"~w\" on port: \"~w\" ~p~n", [Host, Port, Reason]),

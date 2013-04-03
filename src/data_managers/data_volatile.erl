@@ -33,7 +33,14 @@ handler_listener(Ttl, Key, Value) ->
                 true ->
                     false
             end,
-            handler_listener(Ttl, Key, NewValue);
+
+            % If the data is removed, remove the process
+            if
+                NewValue /= false ->
+                    handler_listener(Ttl, Key, NewValue);
+                true ->
+                    false
+            end;
 
         Error ->
             logging ! {add, self(), error, io_lib:format("Message not recognised ~p~n", [Error])}
