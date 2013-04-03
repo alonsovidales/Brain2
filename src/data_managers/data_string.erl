@@ -87,7 +87,6 @@ handler_listener(Ttl, Key, Value) ->
             
 
 create_handler_from_warehouse(Pid, Ttl, Key) ->
-    % TODO: Get the value from the warehouse
     Value = warehouse_read(Key),
     Pid ! ok,
     handler_listener(Ttl, Key, Value).

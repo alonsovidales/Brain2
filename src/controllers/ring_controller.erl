@@ -38,8 +38,8 @@ get_left_right_nodes(NodeId, NodesList) ->
         _MoreThanTwo ->
             if
                 Pos == length(NodesList) ->
-                    {_NodeLeftId, LeftPid} = lists:nth(1, NodesList),
-                    {_NodeRightId, RightPid} = lists:nth(Pos - 1, NodesList);
+                    {_NodeLeftId, LeftPid} = lists:nth(Pos - 1, NodesList),
+                    {_NodeRightId, RightPid} = lists:nth(1, NodesList);
 
                 Pos == 1 ->
                     {_NodeLeftId, LeftPid} = lists:nth(length(NodesList), NodesList),
@@ -116,7 +116,6 @@ convert_to_managers_list([], ManagersList) ->
     ManagersList;
 
 convert_to_managers_list([Manager | Rest], ManagersList) ->
-    %io:format("Managers: ~p ~p ~n" , [ManagersList, {manager, list_to_atom(string:concat("manager@", Manager))}]),
     convert_to_managers_list(Rest, ManagersList ++ [{manager, list_to_atom(string:concat("manager@", Manager))}]).
 
 convert_to_managers_list(Managers) ->

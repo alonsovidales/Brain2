@@ -22,7 +22,6 @@ action_executor(Action, Handler, Key, Params, Redundance, NodeId, PidToConfirm, 
     % to do the action against the loaded data
     if 
         RingComplete ->
-            io:format("Ring complete, try to load...~n", []),
             Handler ! {self(), load, Key},
 
             receive
@@ -48,7 +47,6 @@ action_executor(Action, Handler, Key, Params, Redundance, NodeId, PidToConfirm, 
         ko ->
             logging ! {add, self(), info, io_lib:format("No data found on node: ~s~n", [NodeId])},
             % Search on the rest of nodes of the Ring
-            io:format("Manager: ~p , Values: ~p~n", [ringManager, {get, right, self()}]),
             ringManager ! {get, right, self()},
             receive
                 {ok, NodePid} ->
@@ -105,6 +103,10 @@ listener_loop(Redundance, NodeId, OpsSec, Timestamp) ->
                 InPidToConfirm,
                 InNodeId == NodeId]);
 
+        %%
+        %% Strings data type actions
+        %%
+
         {Pid, "get", Key} ->
             spawn(
                 data_controller,
@@ -134,6 +136,27 @@ listener_loop(Redundance, NodeId, OpsSec, Timestamp) ->
                 data_controller,
                 action_executor,
                 [set, string_manager, Key, [null, true], Redundance, NodeId, Pid, false]);
+
+        %%
+        %% Volatile data type actions
+        %%
+        {Pid, "vget", Key} ->
+            spawn(
+                data_controller,
+                action_executor,
+                [get, volatile_manager, Key, [], Redundance, NodeId, Pid, false]);
+
+        {Pid, "vset", Key, Value} ->
+            spawn(
+                data_controller,
+                action_executor,
+                [set, volatile_manager, Key, [Value], Redundance, NodeId, Pid, false]);
+
+        {Pid, "vdel", Key} ->
+            spawn(
+                data_controller,
+                action_executor,
+                [set, volatile_manager, Key, [null], Redundance, NodeId, Pid, false]);
 
         {checkAlive, Pid} ->
             Pid ! ok;
