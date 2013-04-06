@@ -68,6 +68,6 @@ start_manager() ->
     Config = get_config(init:get_argument(verbose)),
     register(
         logging,
-        spawn_link(logging, init, [Config])),
+        spawn_link(logging, init, [Config, <<"manager">>])),
 
     manager_controller:init(Config).

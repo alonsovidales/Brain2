@@ -165,31 +165,49 @@ listener_loop(Redundance, NodeId, OpsSec, Timestamp) ->
             spawn(
                 data_controller,
                 action_executor,
-                [get, data_hash, Key, [all], Redundance, NodeId, Pid, false]);
+                [get, hash_manager, Key, [all], Redundance, NodeId, Pid, false]);
 
         {Pid, "hget", Key, IntKeys} ->
             spawn(
                 data_controller,
                 action_executor,
-                [get, data_hash, Key, [[string:tokens(IntKeys, ",")]], Redundance, NodeId, Pid, false]);
+                [get, hash_manager, Key, [string:tokens(IntKeys, ",")], Redundance, NodeId, Pid, false]);
 
         {Pid, "hsetkv", Key, IntKeyValue} ->
             spawn(
                 data_controller,
                 action_executor,
-                [set, data_hash, Key, [re:split(IntKeyValue, " ", [{return, list}, {parts, 2}])], Redundance, NodeId, Pid, false]);
+                [set, hash_manager, Key, [false, re:split(IntKeyValue, " ", [{return, list}, {parts, 2}])], Redundance, NodeId, Pid, false]);
+
+        {Pid, "hpsetkv", Key, IntKeyValue} ->
+            spawn(
+                data_controller,
+                action_executor,
+                [set, hash_manager, Key, [true, re:split(IntKeyValue, " ", [{return, list}, {parts, 2}])], Redundance, NodeId, Pid, false]);
 
         {Pid, "hdel", Key} ->
             spawn(
                 data_controller,
                 action_executor,
-                [del, data_hash, Key, [all], Redundance, NodeId, Pid, false]);
+                [del, hash_manager, Key, [false, all], Redundance, NodeId, Pid, false]);
 
         {Pid, "hdel", Key, IntKeys} ->
             spawn(
                 data_controller,
                 action_executor,
-                [del, data_hash, Key, [[string:tokens(IntKeys, ",")]], Redundance, NodeId, Pid, false]);
+                [del, hash_manager, Key, [false, string:tokens(IntKeys, " ")], Redundance, NodeId, Pid, false]);
+
+        {Pid, "hpdel", Key} ->
+            spawn(
+                data_controller,
+                action_executor,
+                [del, hash_manager, Key, [true, all], Redundance, NodeId, Pid, false]);
+
+        {Pid, "hpdel", Key, IntKeys} ->
+            spawn(
+                data_controller,
+                action_executor,
+                [del, hash_manager, Key, [true, string:tokens(IntKeys, " ")], Redundance, NodeId, Pid, false]);
 
         {checkAlive, Pid} ->
             Pid ! ok;

@@ -16,9 +16,9 @@ handler_listener(Ttl, Key, Value) ->
         {Pid, get, Key} ->
             if
                 Value == null ->
-                    Pid ! {ok, "null"};
+                    Pid ! {ok, null};
                 true ->
-                    Pid ! {ok, Value}
+                    Pid ! {ok, {str, "-" ++ Value}}
             end,
             handler_listener(Ttl, Key, Value);
 
@@ -27,8 +27,8 @@ handler_listener(Ttl, Key, Value) ->
             if 
                 Pid /= false ->
                     if
-                        Value == null -> Pid ! {ok, "1"};
-                        true -> Pid ! {ok, "0"}
+                        Value == null -> Pid ! {ok, 1};
+                        true -> Pid ! {ok, 0}
                     end;
                 true ->
                     false

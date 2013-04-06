@@ -12,7 +12,7 @@
     create_handler_from_warehouse/3]).
 
 warehouse_read(Key) ->
-    warehouse ! {self(), get, Key},
+    warehouse ! {self(), get, io_lib:format("str_~s", [Key])},
 
     receive
         {ok, Value} ->
@@ -25,10 +25,10 @@ warehouse_persist(Key, Value) ->
     % Check if value is null, remove it in this case
     case Value of
         null ->
-            warehouse ! {self(), del, Key},
+            warehouse ! {self(), del, io_lib:format("str_~s", [Key])},
             logging ! {add, self(), info, io_lib:format("Deleting key: ~s~n", [Key])};
         _Store ->
-            warehouse ! {self(), save, Key, Value},
+            warehouse ! {self(), save, io_lib:format("str_~s", [Key]), Value},
             logging ! {add, self(), info, io_lib:format("Persisting key: ~s Value: ~s~n", [Key, Value])}
     end,
 
@@ -44,9 +44,9 @@ handler_listener(Ttl, Key, Value) ->
         {Pid, get, Key} ->
             if
                 Value == null ->
-                    Pid ! {ok, "null"};
+                    Pid ! {ok, null};
                 true ->
-                    Pid ! {ok, Value}
+                    Pid ! {ok, {str, "-" ++ Value}}
             end,
             handler_listener(Ttl, Key, Value);
 
@@ -55,8 +55,8 @@ handler_listener(Ttl, Key, Value) ->
             if 
                 Pid /= false ->
                     if
-                        Value == null -> Pid ! {ok, "1"};
-                        true -> Pid ! {ok, "0"}
+                        Value == null -> Pid ! {ok, 1};
+                        true -> Pid ! {ok, 0}
                     end;
                 true ->
                     false
@@ -68,10 +68,10 @@ handler_listener(Ttl, Key, Value) ->
             case Result of
                 ok ->
                     logging ! {add, self(), info, io_lib:format("key persisted!!!!: ~s, ~p~n", [Key, {ok, 1}])},
-                    Pid ! {ok, "1"};
+                    Pid ! {ok, 1};
                 ko -> 
                     logging ! {add, self(), error, io_lib:format("Problem trying to persist the key ~s~n", [Key])},
-                    Pid ! {ok, "0"}
+                    Pid ! {ok, 0}
             end,
 
             handler_listener(Ttl, Key, Value);
