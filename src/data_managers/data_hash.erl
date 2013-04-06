@@ -11,7 +11,7 @@
 
 -export([
     init/1,
-    create_handler_from_warehouse/3]).
+    create_handler_from_warehouse/4]).
 
 convert_bin_to_string_kv([], Converted) ->
     Converted;
@@ -131,8 +131,14 @@ handler_listener(Ttl, Key, Value) ->
             logging ! {add, self(), info, io_lib:format("Key ~s persisted~n", [Key])}
     end.
 
-create_handler_from_warehouse(Pid, Ttl, Key) ->
-    Value = warehouse_read(Key),
+create_handler_from_warehouse(Pid, Ttl, Key, Init) ->
+    case Init of
+        true ->
+            Value = dict:new();
+        false ->
+            Value = warehouse_read(Key)
+    end,
+
     Pid ! ok,
     handler_listener(Ttl, Key, Value).
 
@@ -181,14 +187,14 @@ listener_loop(Ttl) ->
             end,
             listener_loop(Ttl);
 
-        {Pid, load, Key} ->
+        {Pid, load, Key, Init} ->
             % Check if the data was not previously loaded by another process, this warranties the atomicy
             case get_handler(Key) of
                 undefined ->
                     HandlerName = get_handler_name(Key),
                     register(
                         HandlerName,
-                        spawn(data_hash, create_handler_from_warehouse, [Pid, Ttl, Key]));
+                        spawn(data_hash, create_handler_from_warehouse, [Pid, Ttl, Key, Init]));
                 _YetDefined ->
                     false
             end,

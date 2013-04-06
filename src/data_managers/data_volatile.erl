@@ -82,7 +82,7 @@ listener_loop(Ttl) ->
             end,
             listener_loop(Ttl);
 
-        {Pid, load, Key} ->
+        {Pid, load, Key, _Init} ->
             case get_handler(Key) of
                 undefined ->
                     HandlerName = get_handler_name(Key),

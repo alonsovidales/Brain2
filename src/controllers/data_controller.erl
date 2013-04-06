@@ -22,7 +22,7 @@ action_executor(Action, Handler, Key, Params, Redundance, NodeId, PidToConfirm, 
     % to do the action against the loaded data
     if 
         RingComplete ->
-            Handler ! {self(), load, Key},
+            Handler ! {self(), load, Key, Action == set},
 
             receive
                 ko ->

@@ -9,7 +9,7 @@
 
 -export([
     init/1,
-    create_handler_from_warehouse/3]).
+    create_handler_from_warehouse/4]).
 
 warehouse_read(Key) ->
     warehouse ! {self(), get, io_lib:format("str_~s", [Key])},
@@ -86,8 +86,14 @@ handler_listener(Ttl, Key, Value) ->
             
             
 
-create_handler_from_warehouse(Pid, Ttl, Key) ->
-    Value = warehouse_read(Key),
+create_handler_from_warehouse(Pid, Ttl, Key, Init) ->
+    case Init of
+        true ->
+            Value = null;
+        false ->
+            Value = warehouse_read(Key)
+    end,
+
     Pid ! ok,
     handler_listener(Ttl, Key, Value).
 
@@ -122,14 +128,14 @@ listener_loop(Ttl) ->
             end,
             listener_loop(Ttl);
 
-        {Pid, load, Key} ->
+        {Pid, load, Key, Init} ->
             % Check if the data was not previously loaded by another process, this warranties the atomicy
             case get_handler(Key) of
                 undefined ->
                     HandlerName = get_handler_name(Key),
                     register(
                         HandlerName,
-                        spawn(data_string, create_handler_from_warehouse, [Pid, Ttl, Key]));
+                        spawn(data_string, create_handler_from_warehouse, [Pid, Ttl, Key, Init]));
                 _YetDefined ->
                     false
             end,
