@@ -12,7 +12,7 @@
 
 process_command(Command, TimeOut) ->
     % Remove the \r\n at the end of the line added by the client
-    StripCommand = string:strip(string:substr(Command, 1, string:len(Command) - 2), left),
+    StripCommand = string:strip(Command, left),
 
     case re:split(StripCommand, " +", [{return, list}, {parts, 3}]) of
         [Action, Key] ->
@@ -22,10 +22,10 @@ process_command(Command, TimeOut) ->
                     Result;
                 {ko, Error} ->
                     logging ! {add, self(), error, io_lib:format("Request error: ~p ~n", [Error])},
-                    {str, io_lib:format("Request error: ~p ~n", [Error])}
+                    {str, io_lib:format("error Request error: ~p ~n", [Error])}
 
                 after TimeOut ->
-                    {str, io_lib:format("Max execution time exceeded ~p ~n", [TimeOut])}
+                    {str, io_lib:format("error Max execution time exceeded ~p ~n", [TimeOut])}
             end;
                     
         [Action, Key, Args] ->
@@ -35,15 +35,15 @@ process_command(Command, TimeOut) ->
                     Result;
                 {ko, Error} ->
                     logging ! {add, self(), error, io_lib:format("Request error: ~p ~n", [Error])},
-                    {str, io_lib:format("Request error: ~p ~n", [Error])}
+                    {str, io_lib:format("error Request error: ~p ~n", [Error])}
 
                 after TimeOut ->
-                    {str, io_lib:format("Max execution time exceeded ~p ~n", [TimeOut])}
+                    {str, io_lib:format("error Max execution time exceeded ~p ~n", [TimeOut])}
             end;
                     
         Error ->
             logging ! {add, self(), error, io_lib:format("Problem parsing the input: ~p ~n", [Error])},
-            {str, io_lib:format("Problem parsing the input ~p ~n", [Error])}
+            {str, io_lib:format("error Problem parsing the input ~p ~n", [Error])}
     end.
 
 return_lsit(_Socket, []) ->

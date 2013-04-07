@@ -61,7 +61,12 @@ get_values_int_keys([], _Values, Return) ->
     Return;
 
 get_values_int_keys([Key | Rest], Values, Return) ->
-    get_values_int_keys(Rest, Values, Return ++ [Key ++ " " ++ dict:fetch(Key, Values)]);
+    case dict:is_key(Key, Values) of
+        true ->
+            get_values_int_keys(Rest, Values, Return ++ [Key ++ " " ++ dict:fetch(Key, Values)]);
+        false ->
+            get_values_int_keys(Rest, Values, Return)
+    end;
 
 get_values_int_keys(all, Values, _Return) ->
     get_values_int_keys(dict:fetch_keys(Values), Values, []).
