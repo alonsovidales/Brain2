@@ -46,11 +46,12 @@ process_command(Command, TimeOut) ->
             {str, io_lib:format("error Problem parsing the input ~p ~n", [Error])}
     end.
 
-return_lsit(_Socket, []) ->
+return_list(_Socket, []) ->
     true;
-return_lsit(Socket, [Line | Rest]) ->
+return_list(Socket, [Line | Rest]) ->
+    io:format("Sending list: ~p~n", [Line]),
     gen_tcp:send(Socket, Line),
-    return_lsit(Socket, Rest).
+    return_list(Socket, Rest).
 
 handle(MainPid, Socket, TimeOut) ->
     inet:setopts(Socket, [{active, once}]),
@@ -69,7 +70,7 @@ handle(MainPid, Socket, TimeOut) ->
                     gen_tcp:send(Socket, Result);
 
                 {list, Result} ->
-                    return_lsit(Socket, Result);
+                    return_list(Socket, Result);
 
                 Result ->
                     gen_tcp:send(

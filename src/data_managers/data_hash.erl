@@ -11,7 +11,7 @@
 
 -export([
     init/1,
-    create_handler_from_warehouse/4]).
+    create_handler_from_warehouse/3]).
 
 convert_bin_to_string_kv([], Converted) ->
     Converted;
@@ -39,6 +39,9 @@ get_serialized_str([Key | Rest], Dict, Serialized) ->
 serialize(Dict) ->
     "{" ++ string:join(get_serialized_str(dict:fetch_keys(Dict), Dict, ""), ",") ++ "}".
 
+serialize_keys(IntKeys, Dict) ->
+    "{" ++ string:join(get_serialized_str(IntKeys, Dict, ""), ",") ++ "}".
+
 warehouse_persist(Key, Value) ->
     % Check if value is null, remove it in this case
     case length(dict:fetch_keys(Value)) of
@@ -57,20 +60,6 @@ warehouse_persist(Key, Value) ->
             ko
     end.
 
-get_values_int_keys([], _Values, Return) ->
-    Return;
-
-get_values_int_keys([Key | Rest], Values, Return) ->
-    case dict:is_key(Key, Values) of
-        true ->
-            get_values_int_keys(Rest, Values, Return ++ [Key ++ " " ++ dict:fetch(Key, Values)]);
-        false ->
-            get_values_int_keys(Rest, Values, Return)
-    end;
-
-get_values_int_keys(all, Values, _Return) ->
-    get_values_int_keys(dict:fetch_keys(Values), Values, []).
-
 del_dict_keys([], Value) ->
     Value;
 del_dict_keys([Key | Rest], Value) ->
@@ -83,7 +72,12 @@ handler_listener(Ttl, Key, Value) ->
                 0 ->
                     Pid ! {ok, null};
                 _HaveValues ->
-                    Pid ! {ok, {list, get_values_int_keys(IntKeys, Value, [])}}
+                    case IntKeys of
+                        all ->
+                            Pid ! {ok, {str, serialize(Value)}};
+                        true ->
+                            Pid ! {ok, {str, serialize_keys(IntKeys, Value)}}
+                    end
             end,
             handler_listener(Ttl, Key, Value);
 
@@ -136,14 +130,8 @@ handler_listener(Ttl, Key, Value) ->
             logging ! {add, self(), info, io_lib:format("Key ~s persisted~n", [Key])}
     end.
 
-create_handler_from_warehouse(Pid, Ttl, Key, Init) ->
-    case Init of
-        true ->
-            Value = dict:new();
-        false ->
-            Value = warehouse_read(Key)
-    end,
-
+create_handler_from_warehouse(Pid, Ttl, Key) ->
+    Value = warehouse_read(Key),
     Pid ! ok,
     handler_listener(Ttl, Key, Value).
 
@@ -192,14 +180,14 @@ listener_loop(Ttl) ->
             end,
             listener_loop(Ttl);
 
-        {Pid, load, Key, Init} ->
+        {Pid, load, Key, _Init} ->
             % Check if the data was not previously loaded by another process, this warranties the atomicy
             case get_handler(Key) of
                 undefined ->
                     HandlerName = get_handler_name(Key),
                     register(
                         HandlerName,
-                        spawn(data_hash, create_handler_from_warehouse, [Pid, Ttl, Key, Init]));
+                        spawn(data_hash, create_handler_from_warehouse, [Pid, Ttl, Key]));
                 _YetDefined ->
                     false
             end,
