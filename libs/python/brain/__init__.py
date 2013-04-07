@@ -1,6 +1,11 @@
-uthor__ = "Alonso Vidales"
+__author__ = "Alonso Vidales"
 __email__ = "alonso.vidales@tras2.es"
-__date__ = "2013-04-07"
+__date__ = "2013-04-06"
+
+__version__ = "RC1"
 
 __all__ = [
-    'brain']
+    'Brain'
+]
+
+from brain import Brain

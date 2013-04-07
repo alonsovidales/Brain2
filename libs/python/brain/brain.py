@@ -1,6 +1,4 @@
-#!/usr/bin/env python
-
-import socket
+import socket, json
 
 __author__ = "Alonso Vidales"
 __email__ = "alonso.vidales@tras2.es"
@@ -62,14 +60,20 @@ class Brain:
     """
     Hash data type queries
     """
-    def __parseHashResultAsDict(self, inResult):
-        return inResult
 
     def hget(self, inKey, inIntKeys = []):
         if len(inIntKeys) > 0:
-            return self.__parseHashResultAsDict(self.__exec("hget", inKey, "%s" % (" ".join(inIntKeys))))
+            result = self.__exec("hget", inKey, "%s" % (" ".join(inIntKeys)))
+            if result != None and result[0] == '{':
+                return json.loads(result)
 
-        return self.__parseHashResultAsDict(self.__exec("hget", inKey))
+            return result
+
+        result = self.__exec("hget", inKey)
+        if result != None and result[0] == '{':
+            return json.loads(result)
+
+        return result
 
     def hsetkv(self, inKey, inInKey, inValue):
         return self.__exec("hsetkv", inKey, "%s %s" % (inInKey, inValue))
@@ -79,15 +83,15 @@ class Brain:
 
     def hdel(self, inKey, inIntKeys = []):
         if len(inIntKeys) > 0:
-            return self.__parseHashResultAsDict(self.__exec("hdel", inKey, "%s" % (" ".join(inIntKeys))))
+            return self.__exec("hdel", inKey, "%s" % (" ".join(inIntKeys)))
 
-        return self.__parseHashResultAsDict(self.__exec("hdel", inKey))
+        return self.__exec("hdel", inKey)
 
     def hpdel(self, inKey, inIntKeys = []):
         if len(inIntKeys) > 0:
-            return self.__parseHashResultAsDict(self.__exec("hpdel", inKey, "%s" % (" ".join(inIntKeys))))
+            return self.__exec("hpdel", inKey, "%s" % (" ".join(inIntKeys)))
 
-        return self.__parseHashResultAsDict(self.__exec("hpdel", inKey))
+        return self.__exec("hpdel", inKey)
 
     def close(self):
         self.__socket.close()
