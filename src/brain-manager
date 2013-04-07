@@ -1,0 +1,4 @@
+#!/bin/bash
+
+cd /usr/local/brain/
+erl -noshell -s bootstrap start_manager -name manager -detached

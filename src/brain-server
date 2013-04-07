@@ -1,0 +1,5 @@
+#!/bin/bash
+
+cd /usr/local/brain/
+erl -noshell -s bootstrap start_node -name node_$1 -node_id node_$1 -detached
+echo "Brain started as detached"

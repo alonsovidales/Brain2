@@ -1,4 +1,7 @@
 #!/bin/bash
+
+# This file is used only fortesting propouses
+
 rm *.beam
 echo "Compiling Vendor libs..."
 erlc vendor/mochijson2.erl
