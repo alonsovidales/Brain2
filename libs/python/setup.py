@@ -20,6 +20,7 @@ setup(
     keywords=['Brain', 'key-value store', 'cache'],
     license='MIT',
     packages=['brain'],
+    scripts=['brain-console.py'],
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Environment :: Console',

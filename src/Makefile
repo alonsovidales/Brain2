@@ -27,10 +27,6 @@ install:
 	@cp brain-server $(INSTALL_BIN)
 	@chmod a+x $(INSTALL_BIN)brain-server
 
-	@echo "Installing Python libraries"
-	@cp console/brain-console.py $(INSTALL_DIR)
-	@chmod a+x $(INSTALL_DIR)brain-console.py
-	@ln -fs $(INSTALL_DIR)brain-console.py $(INSTALL_BIN)brain-console
 	@cd ../libs/python/; python setup.py install
 
 	@echo "*************************************************************************************************"
