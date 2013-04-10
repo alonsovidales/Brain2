@@ -81,6 +81,7 @@ handler_listener(Ttl, Key, Value) ->
 
         after Ttl ->
             warehouse_persist(Key, Value),
+            string_manager ! {keyDeleted},
             logging ! {add, self(), info, io_lib:format("Key ~s persisted~n", [Key])}
     end.
             
@@ -104,7 +105,7 @@ get_handler(Key) ->
     HandlerName = get_handler_name(Key),
     whereis(HandlerName).
 
-listener_loop(Ttl) ->
+listener_loop(Ttl, CurrentKeys) ->
     receive
         {Pid, get, Key} ->
             case get_handler(Key) of
@@ -112,8 +113,7 @@ listener_loop(Ttl) ->
                     Pid ! ko;
                 Handler when is_pid(Handler) ->
                     Handler ! {Pid, get, Key}
-            end,
-            listener_loop(Ttl);
+            end;
 
         {Pid, set, Key, [Value, Persist]} ->
             case get_handler(Key) of
@@ -125,8 +125,7 @@ listener_loop(Ttl) ->
                     true ->
                         Handler ! {Pid, set, Value}
                     end
-            end,
-            listener_loop(Ttl);
+            end;
 
         {Pid, load, Key, Init} ->
             % Check if the data was not previously loaded by another process, this warranties the atomicy
@@ -135,23 +134,25 @@ listener_loop(Ttl) ->
                     HandlerName = get_handler_name(Key),
                     register(
                         HandlerName,
-                        spawn(data_string, create_handler_from_warehouse, [Pid, Ttl, Key, Init]));
+                        spawn(data_string, create_handler_from_warehouse, [Pid, Ttl, Key, Init])),
+
+                        listener_loop(Ttl, CurrentKeys + 1);
                 _YetDefined ->
                     false
-            end,
-
-            listener_loop(Ttl);
+            end;
 
         {Pid, persist, Key} ->
             case get_handler(Key) of
                 undefined -> Pid ! ko;
                 Handler when is_pid(Handler) ->
                     Handler ! {Pid, persist}
-            end,
-            listener_loop(Ttl);
+            end;
+
+        {keyDeleted} ->
+            listener_loop(Ttl, CurrentKeys - 1);
 
         {getStats, Pid} ->
-            Pid ! {stringStatsTODO};
+            Pid ! {ok, CurrentKeys};
 
         {persistAll, Flush} ->
             TODO = 1;
@@ -161,8 +162,8 @@ listener_loop(Ttl) ->
             
         Error ->
             logging ! {add, self(), error, io_lib:format("Commad not recognise ~p~n", [Error])}
-    end.
+    end,
+    listener_loop(Ttl, CurrentKeys).
 
 init(Config) ->
-    listener_loop(
-        list_to_integer(dict:fetch("key_ttl", Config))).
+    listener_loop(list_to_integer(dict:fetch("key_ttl", Config)), 0).

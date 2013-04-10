@@ -80,13 +80,15 @@ action_executor(Action, Handler, Key, Params, Redundance, NodeId, PidToConfirm, 
 %% This method will listen for incomming messages from the client, and on a new process will attend them
 %% Acts as an adapter of the different data type managers.
 %%
-listener_loop(Redundance, NodeId, OpsSec, Timestamp) ->
+listener_loop(Redundance, NodeId, LastSecOps, OpsSec, Timestamp) ->
     % Used to get stats of ops / sec, etc
     {_Mega, TimestampSec, _Micro} = now(),
     if
         Timestamp == TimestampSec ->
-            NowOpsSec = OpsSec + 1;
+            NowOpsSec = OpsSec + 1,
+            NewLastSecOps = LastSecOps;
         true ->
+            NewLastSecOps = OpsSec,
             NowOpsSec = 1
     end,
 
@@ -171,7 +173,7 @@ listener_loop(Redundance, NodeId, OpsSec, Timestamp) ->
             spawn(
                 data_controller,
                 action_executor,
-                [get, hash_manager, Key, [string:tokens(IntKeys, ",")], Redundance, NodeId, Pid, false]);
+                [get, hash_manager, Key, [string:tokens(IntKeys, " ")], Redundance, NodeId, Pid, false]);
 
         {Pid, "hsetkv", Key, IntKeyValue} ->
             spawn(
@@ -227,7 +229,7 @@ listener_loop(Redundance, NodeId, OpsSec, Timestamp) ->
         {update, Nodes} ->
             ringManager ! {update, Nodes};
 
-        {getStats, Pid} ->
+        {Pid, "info"} ->
             hash_manager ! {getStats, self()},
             receive
                 {ok, HashStatsInfo} ->
@@ -251,13 +253,14 @@ listener_loop(Redundance, NodeId, OpsSec, Timestamp) ->
                 ko ->
                     VolatileStats = error
             end,
-            Pid ! {ok, {NowOpsSec, HashStats, StringStats, VolatileStats}};
+            % NowOpsSec
+            Pid ! {ok, [erlang:memory() ++ [{ops_sec, NewLastSecOps}] ++ [{hash_keys, HashStats}] ++ [{strings_keys, StringStats}] ++ [{volatile_keys, VolatileStats}]]};
 
         Error ->
             logging ! {add, self(), error, io_lib:format("Commad not recognise~p~n", [Error])}
     end,
 
-    listener_loop(Redundance, NodeId, NowOpsSec, TimestampSec).
+    listener_loop(Redundance, NodeId, NewLastSecOps, NowOpsSec, TimestampSec).
 
 init(Config, NodeId) ->
     register(
@@ -275,5 +278,6 @@ init(Config, NodeId) ->
     listener_loop(
         list_to_integer(dict:fetch("redundance", Config)),
         NodeId,
+        0,
         0,
         0).

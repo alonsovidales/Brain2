@@ -46,7 +46,7 @@ handler_listener(Ttl, Key, Value) ->
             logging ! {add, self(), error, io_lib:format("Message not recognised ~p~n", [Error])}
 
         after Ttl ->
-            false
+            volatile_manager ! {keyDeleted}
     end.
             
             
@@ -62,7 +62,7 @@ get_handler(Key) ->
     HandlerName = get_handler_name(Key),
     whereis(HandlerName).
 
-listener_loop(Ttl) ->
+listener_loop(Ttl, CurrentKeys) ->
     receive
         {Pid, get, Key} ->
             case get_handler(Key) of
@@ -70,8 +70,7 @@ listener_loop(Ttl) ->
                     Pid ! ko;
                 Handler when is_pid(Handler) ->
                     Handler ! {Pid, get, Key}
-            end,
-            listener_loop(Ttl);
+            end;
 
         {Pid, set, Key, [Value]} ->
             case get_handler(Key) of
@@ -79,8 +78,7 @@ listener_loop(Ttl) ->
                     Pid ! ko;
                 Handler when is_pid(Handler) ->
                     Handler ! {Pid, set, Value}
-            end,
-            listener_loop(Ttl);
+            end;
 
         {Pid, load, Key, _Init} ->
             case get_handler(Key) of
@@ -88,19 +86,20 @@ listener_loop(Ttl) ->
                     HandlerName = get_handler_name(Key),
                     register(
                         HandlerName,
-                        spawn(data_volatile, create_handler, [Pid, Ttl, Key]));
+                        spawn(data_volatile, create_handler, [Pid, Ttl, Key])),
+                    listener_loop(Ttl, CurrentKeys + 1);
                 _YetDefined ->
                     false
-            end,
-
-            listener_loop(Ttl);
+            end;
 
         {Pid, persist, _Key} ->
-            Pid ! ok,
-            listener_loop(Ttl);
+            Pid ! ok;
+
+        {keyDeleted} ->
+            listener_loop(Ttl, CurrentKeys - 1);
 
         {getStats, Pid} ->
-            Pid ! {volatileStatsTODO};
+            Pid ! {ok, CurrentKeys};
 
         {persistAll, _Flush} ->
             ok;
@@ -110,8 +109,8 @@ listener_loop(Ttl) ->
             
         Error ->
             logging ! {add, self(), error, io_lib:format("Commad not recognise ~p~n", [Error])}
-    end.
+    end,
+    listener_loop(Ttl, CurrentKeys).
 
 init(Config) ->
-    listener_loop(
-        list_to_integer(dict:fetch("key_ttl", Config))).
+    listener_loop(list_to_integer(dict:fetch("key_ttl", Config)), 0).

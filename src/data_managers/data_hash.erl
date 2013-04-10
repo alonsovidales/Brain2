@@ -34,7 +34,12 @@ warehouse_read(Key) ->
 get_serialized_str([], _Dict, Serialized) ->
     Serialized;
 get_serialized_str([Key | Rest], Dict, Serialized) ->
-    get_serialized_str(Rest, Dict, Serialized ++ [io_lib:format("~p:~p", [Key, dict:fetch(Key, Dict)])]).
+    case dict:is_key(Key, Dict) of
+        true ->
+            get_serialized_str(Rest, Dict, Serialized ++ [io_lib:format("~p:~p", [Key, dict:fetch(Key, Dict)])]);
+        false ->
+            get_serialized_str(Rest, Dict, Serialized)
+    end.
 
 serialize(Dict) ->
     "{" ++ string:join(get_serialized_str(dict:fetch_keys(Dict), Dict, ""), ",") ++ "}".
@@ -72,8 +77,8 @@ handler_listener(Ttl, Key, Value) ->
                 0 ->
                     Pid ! {ok, null};
                 _HaveValues ->
-                    case IntKeys of
-                        all ->
+                    if
+                        IntKeys == all ->
                             Pid ! {ok, {str, serialize(Value)}};
                         true ->
                             Pid ! {ok, {str, serialize_keys(IntKeys, Value)}}
@@ -127,6 +132,7 @@ handler_listener(Ttl, Key, Value) ->
 
         after Ttl ->
             warehouse_persist(Key, Value),
+            hash_manager ! {keyDeleted},
             logging ! {add, self(), info, io_lib:format("Key ~s persisted~n", [Key])}
     end.
 
@@ -142,7 +148,7 @@ get_handler(Key) ->
     HandlerName = get_handler_name(Key),
     whereis(HandlerName).
 
-listener_loop(Ttl) ->
+listener_loop(Ttl, CurrentKeys) ->
     receive
         {Pid, get, Key, [IntKeys]} ->
             case get_handler(Key) of
@@ -150,8 +156,7 @@ listener_loop(Ttl) ->
                     Pid ! ko;
                 Handler when is_pid(Handler) ->
                     Handler ! {Pid, get, Key, IntKeys}
-            end,
-            listener_loop(Ttl);
+            end;
 
         {Pid, set, Key, [Persist, [IntKey, IntValue]]} ->
             case get_handler(Key) of
@@ -163,8 +168,7 @@ listener_loop(Ttl) ->
                     true ->
                         Handler ! {Pid, set, IntKey, IntValue}
                     end
-            end,
-            listener_loop(Ttl);
+            end;
 
         {Pid, del, Key, [Persist, IntKeys]} ->
             case get_handler(Key) of
@@ -177,8 +181,7 @@ listener_loop(Ttl) ->
                     true ->
                         Handler ! {Pid, del, Key, IntKeys}
                     end
-            end,
-            listener_loop(Ttl);
+            end;
 
         {Pid, load, Key, _Init} ->
             % Check if the data was not previously loaded by another process, this warranties the atomicy
@@ -192,18 +195,20 @@ listener_loop(Ttl) ->
                     false
             end,
 
-            listener_loop(Ttl);
+            listener_loop(Ttl, CurrentKeys + 1);
 
         {Pid, persist, Key} ->
             case get_handler(Key) of
                 undefined -> Pid ! ko;
                 Handler when is_pid(Handler) ->
                     Handler ! {Pid, persist}
-            end,
-            listener_loop(Ttl);
+            end;
+
+        {keyDeleted} ->
+            listener_loop(Ttl, CurrentKeys - 1);
 
         {getStats, Pid} ->
-            Pid ! {hashStatsTODO};
+            Pid ! {ok, CurrentKeys};
 
         {persistAll, _Flush} ->
             _TODO = 1;
@@ -213,8 +218,8 @@ listener_loop(Ttl) ->
             
         Error ->
             logging ! {add, self(), error, io_lib:format("Commad not recognise ~p~n", [Error])}
-    end.
+    end,
+    listener_loop(Ttl, CurrentKeys).
 
 init(Config) ->
-    listener_loop(
-        list_to_integer(dict:fetch("key_ttl", Config))).
+    listener_loop(list_to_integer(dict:fetch("key_ttl", Config)), 0).

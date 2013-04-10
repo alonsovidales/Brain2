@@ -41,6 +41,19 @@ process_command(Command, TimeOut) ->
                     {str, io_lib:format("error Max execution time exceeded ~p ~n", [TimeOut])}
             end;
                     
+        [Action] ->
+            data_controller ! {self(), Action},
+            receive
+                {ok, Result} ->
+                    Result;
+                {ko, Error} ->
+                    logging ! {add, self(), error, io_lib:format("Request error: ~p ~n", [Error])},
+                    {str, io_lib:format("error Request error: ~p ~n", [Error])}
+
+                after TimeOut ->
+                    {str, io_lib:format("error Max execution time exceeded ~p ~n", [TimeOut])}
+            end;
+
         Error ->
             logging ! {add, self(), error, io_lib:format("Problem parsing the input: ~p ~n", [Error])},
             {str, io_lib:format("error Problem parsing the input ~p ~n", [Error])}
@@ -49,7 +62,6 @@ process_command(Command, TimeOut) ->
 return_list(_Socket, []) ->
     true;
 return_list(Socket, [Line | Rest]) ->
-    io:format("Sending list: ~p~n", [Line]),
     gen_tcp:send(Socket, Line),
     return_list(Socket, Rest).
 
