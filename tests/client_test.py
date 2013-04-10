@@ -9,14 +9,14 @@ __date__ = "2013-04-03"
 
 class ClientTest(unittest.TestCase):
     __host = "localhost"
-    __fromPort = 2997
-    __toPort = 2999
+    __fromPort = 5997
+    __toPort = 5999
     __connections = []
     # Hash test config
     __numOfHashPrimaryKeys = 10
     __numOfHashIntKeys = 5
     # Volatile test config
-    __numOfVolatileKeys = 10
+    __numOfVolatileKeys = 10000
     # String test config
     __numOfStringKeys = 20
 
@@ -108,7 +108,7 @@ class ClientTest(unittest.TestCase):
         for primKey in xrange(0, self.__numOfHashPrimaryKeys):
             for intKey in xrange(0, self.__numOfHashIntKeys):
                 value = self.__getConnection().hget("hash_%s" % (primKey), ["int_%s" % (intKey)])
-                self.assertEqual("int_%s %s" % (intKey, keys["hash_%s" % (primKey)]["int_%s" % (intKey)]), value)
+                self.assertEqual({"int_%s" % (intKey): keys["hash_%s" % (primKey)]["int_%s" % (intKey)]}, value)
 
         # Remove all the keys
         for count in xrange(0, self.__numOfVolatileKeys):

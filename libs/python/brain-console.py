@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import argparse
+import argparse, sys, re
 from brain import Brain
 
 __author__ = "Alonso Vidales"
@@ -85,16 +85,48 @@ class BrainConsole:
             'desc': "hpdel <key> [internal_key1, internal_key2, ...] :\t\tRemoves the specified internal keys from the hash, on memory and warehouse, or all the hash if not internal keys specified"
         },
 
+        # Special actions
         'quit': {
-            'params': '*',
+            'params': '-',
             'result': 'str',
             'desc': "quit : Closes the current terminal"
+        },
+
+        'info': {
+            'params': '-',
+            'result': 'str',
+            'desc': "info : Return the information of the current node"
+        },
+
+        'shutdown': {
+            'params': '-',
+            'result': 'str',
+            'desc': "shutdown : The node stops to receive new client requests, persists all the keys, and ends the server execution"
         },
     }
 
     def __getHelp(self):
         for action, attribs in self.__actions.items():
             print attribs['desc']
+
+    def __printInfo(self, infoStr):
+        try:
+            matches = dict([match.split(',') for match in re.findall("(\w+,\d+)", infoStr[0])])
+
+            print "-- Memory usage --"
+            print "Process: %.2f M" % ((float(matches.get('processes_used')) / 1024 / 1024))
+            print "System:\t %.2f M" % ((float(matches.get('system')) / 1024 / 1024))
+            print "Total:\t %.2f M" % ((float(matches.get('total')) / 1024 / 1024))
+            print ""
+            print "-- Keys by type --"
+            print "String:\t   %s" % (matches.get('strings_keys'))
+            print "Hash:\t   %s" % (matches.get('hash_keys'))
+            print "Volatile:  %s" % (matches.get('volatile_keys'))
+            print ""
+            print "Ops / sec: %s" % (matches.get('ops_sec'))
+            print ""
+        except ValueError:
+            print "ERROR"
 
     def run(self):
         try:
@@ -108,51 +140,66 @@ class BrainConsole:
             return False
 
         action = ''
+        commandNumber = 1
         while action != 'quit':
+            sys.stdout.write("%s > " % (commandNumber))
+            commandNumber += 1
             action = raw_input()
             if action != 'quit':
                 if action == '?' or action == 'help':
                     self.__getHelp()
                 else:
                     try:
-                        [command, values] = action.split(' ', 1)
+                        # Check if is an special action
+                        if action.strip() in self.__actions and self.__actions[action.strip()]['params'] == '-':
+                            result = getattr(self.__connection, action)()
 
-                        if command <> 'quit':
-                            if command not in self.__actions:
-                                print "Command not found: %s" % (action)
+                            if action.strip() == 'info':
+                                self.__printInfo(result)
+                            elif type(result) == type({}):
+                                for key, value in result.items():
+                                    print "%s: %s" % (key, value)
                             else:
-                                try:
-                                    if self.__actions[command]['params'] == '*':
-                                        values = values.split(' ')
-                                    else:
-                                        values = values.split(' ', self.__actions[command]['params'])
-                                    key = values.pop(0)
+                                print result
+                        else:
+                            [command, values] = action.split(' ', 1)
 
-                                    if self.__actions[command]['params'] != '*' and len(values) < self.__actions[command]['params']:
-                                        print "Command usage: %s" % (self.__actions[command]['desc'])
-                                    else:
+                            if command <> 'quit':
+                                if command not in self.__actions:
+                                    print "Command not found: %s" % (action)
+                                else:
+                                    try:
                                         if self.__actions[command]['params'] == '*':
-                                            params = [key] + [values]
+                                            values = values.split(' ')
                                         else:
-                                            params = [key] + values
+                                            values = values.split(' ', self.__actions[command]['params'])
+                                        key = values.pop(0)
 
-                                        try:
-                                            if command == 'del':
-                                                command = 'remove'
-                                            elif command == 'pdel':
-                                                command = 'premove'
-
-                                            result = getattr(self.__connection, command)(*params)
-                                            if type(result) == type({}):
-                                                for key, value in result.items():
-                                                    print "%s: %s" % (key, value)
+                                        if self.__actions[command]['params'] != '*' and len(values) < self.__actions[command]['params']:
+                                            print "Command usage: %s" % (self.__actions[command]['desc'])
+                                        else:
+                                            if self.__actions[command]['params'] == '*':
+                                                params = [key] + [values]
                                             else:
-                                                print result
-                                        except ValueError:
-                                            print "Problem executing command"
+                                                params = [key] + values
 
-                                except:
-                                    print "Command usage: %s" % (self.__actions[action.strip()]['desc'])
+                                            try:
+                                                if command == 'del':
+                                                    command = 'remove'
+                                                elif command == 'pdel':
+                                                    command = 'premove'
+    
+                                                result = getattr(self.__connection, command)(*params)
+                                                if type(result) == type({}):
+                                                    for key, value in result.items():
+                                                        print "%s: %s" % (key, value)
+                                                else:
+                                                    print result
+                                            except ValueError:
+                                                print "Problem executing command"
+
+                                    except:
+                                        print "Command usage: %s" % (self.__actions[action.strip()]['desc'])
 
                     except:
                         if action.strip() != '':

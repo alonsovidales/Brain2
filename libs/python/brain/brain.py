@@ -5,11 +5,13 @@ __email__ = "alonso.vidales@tras2.es"
 __date__ = "2013-04-06"
 
 class Brain:
-    def __exec(self, action, key, value = False):
+    def __exec(self, action, key = False, value = False):
         if self.__verbose:
             print "Exec: %s %s %s" % (action, key, value)
 
-        if value == False:
+        if key == False:
+            self.__socket.sendall("%s" % (action))
+        elif value == False:
             self.__socket.sendall("%s %s" % (action, key))
         else:
             self.__socket.sendall("%s %s %s" % (action, key, value))
@@ -92,6 +94,12 @@ class Brain:
             return self.__exec("hpdel", inKey, "%s" % (" ".join(inIntKeys)))
 
         return self.__exec("hpdel", inKey)
+
+    """
+    Special queries to control some servers features
+    """
+    def info(self):
+        return self.__exec("info").split('|')
 
     def close(self):
         self.__socket.close()
