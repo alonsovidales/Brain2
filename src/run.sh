@@ -20,11 +20,11 @@ erlc bootstrap.erl
 #erl -noshell -s bootstrap start_manager -name manager -verbose false 
 #sleep 2
 
-echo "Strating node 1..."
-erl -noshell -s bootstrap start_node -name node_1$1 -node_id node_1$1 -port $1997 -verbose false &
+#echo "Strating node 1..."
+#erl -noshell -s bootstrap start_node -name node_1$1 -node_id node_1$1 -port $1997 -verbose false &
 
-echo "Strating node 2..."
-erl -noshell -s bootstrap start_node -name node_2$1 -node_id node_2$1 -port $1998 -verbose false &
+#echo "Strating node 2..."
+#erl -noshell -s bootstrap start_node -name node_2$1 -node_id node_2$1 -port $1998 -verbose false &
 
 echo "Strating node 3..."
 erl -noshell -s bootstrap start_node -name node_3$1 -node_id node_3$1 -port $1999 -verbose false

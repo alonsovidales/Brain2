@@ -81,7 +81,11 @@ listener_loop(NodeId, LeftNode, RightNode) ->
                 Stats ->
                     Pid ! {Total, Allocated, Worst, Stats}
             end,
-            listener_loop(NodeId, LeftNode, RightNode)
+            listener_loop(NodeId, LeftNode, RightNode);
+
+        {removeNode, Pid} ->
+            logging ! {add, self(), info, io_lib:format("Ring Manager stopped~n", [])},
+            Pid ! ok
     end.
 
 %%

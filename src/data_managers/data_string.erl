@@ -154,11 +154,9 @@ listener_loop(Ttl, CurrentKeys) ->
         {getStats, Pid} ->
             Pid ! {ok, CurrentKeys};
 
-        {persistAll, Flush} ->
-            TODO = 1;
-
-        {flushAll} ->
-            TODO = 1;
+        {shutdown, Pid} ->
+            io:format("TODO: Persist string~n"),
+            Pid ! ok;
             
         Error ->
             logging ! {add, self(), error, io_lib:format("Commad not recognise ~p~n", [Error])}
