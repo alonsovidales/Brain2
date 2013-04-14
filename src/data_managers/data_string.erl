@@ -9,7 +9,7 @@
 
 -export([
     init/1,
-    create_handler_from_warehouse/4]).
+    create_handler_from_warehouse/5]).
 
 warehouse_read(Key) ->
     warehouse ! {self(), get, io_lib:format("str_~s", [Key])},
@@ -39,7 +39,7 @@ warehouse_persist(Key, Value) ->
             ko
     end.
 
-handler_listener(Ttl, Key, Value) ->
+handler_listener(Ttl, Key, Value, HandlerName, Inactivity) ->
     receive
         {Pid, get, Key} ->
             if
@@ -48,7 +48,7 @@ handler_listener(Ttl, Key, Value) ->
                 true ->
                     Pid ! {ok, {str, "-" ++ Value}}
             end,
-            handler_listener(Ttl, Key, Value);
+            handler_listener(Ttl, Key, Value, HandlerName, false);
 
         {Pid, set, NewValue} ->
             % Return 0 if this is a new field, or 1 if the key has an assigned value
@@ -61,7 +61,7 @@ handler_listener(Ttl, Key, Value) ->
                 true ->
                     false
             end,
-            handler_listener(Ttl, Key, NewValue);
+            handler_listener(Ttl, Key, NewValue, HandlerName, false);
 
         {Pid, persist} ->
             Result = warehouse_persist(Key, Value),
@@ -74,20 +74,26 @@ handler_listener(Ttl, Key, Value) ->
                     Pid ! {ok, 0}
             end,
 
-            handler_listener(Ttl, Key, Value);
+            handler_listener(Ttl, Key, Value, HandlerName, false);
 
         Error ->
             logging ! {add, self(), error, io_lib:format("Message not recognised ~p~n", [Error])}
 
         after Ttl ->
-            warehouse_persist(Key, Value),
-            string_manager ! {keyDeleted},
-            logging ! {add, self(), info, io_lib:format("Key ~s persisted~n", [Key])}
+            case Inactivity of
+                false ->
+                    warehouse_persist(Key, Value),
+                    logging ! {add, self(), info, io_lib:format("Key ~s persisted~n", [Key])},
+                    handler_listener(Ttl, Key, Value, HandlerName, true);
+                true ->
+                    string_manager ! {keyDeleted, HandlerName},
+                    logging ! {add, self(), info, io_lib:format("Key ~s removed from memory~n", [Key])}
+            end
     end.
             
             
 
-create_handler_from_warehouse(Pid, Ttl, Key, Init) ->
+create_handler_from_warehouse(Pid, Ttl, Key, Init, HandlerName) ->
     case Init of
         true ->
             Value = null;
@@ -96,7 +102,7 @@ create_handler_from_warehouse(Pid, Ttl, Key, Init) ->
     end,
 
     Pid ! ok,
-    handler_listener(Ttl, Key, Value).
+    handler_listener(Ttl, Key, Value, HandlerName, false).
 
 get_handler_name(Key) ->
     list_to_atom(string:concat("str_", Key)).
@@ -105,7 +111,17 @@ get_handler(Key) ->
     HandlerName = get_handler_name(Key),
     whereis(HandlerName).
 
-listener_loop(Ttl, CurrentKeys) ->
+persists_all([]) ->
+    true;
+persists_all([Pid | Rest]) ->
+    Pid ! {self(), persist},
+    receive
+        {ok, _Result} ->
+            true
+    end,
+    persists_all(Rest).
+
+listener_loop(Ttl, CurrentKeys, Handlers) ->
     receive
         {Pid, get, Key} ->
             case get_handler(Key) of
@@ -134,11 +150,11 @@ listener_loop(Ttl, CurrentKeys) ->
                     HandlerName = get_handler_name(Key),
                     register(
                         HandlerName,
-                        spawn(data_string, create_handler_from_warehouse, [Pid, Ttl, Key, Init])),
+                        spawn(data_string, create_handler_from_warehouse, [Pid, Ttl, Key, Init, HandlerName])),
 
-                        listener_loop(Ttl, CurrentKeys + 1);
+                    listener_loop(Ttl, CurrentKeys + 1, Handlers ++ [HandlerName]);
                 _YetDefined ->
-                    false
+                    listener_loop(Ttl, CurrentKeys + 1, Handlers)
             end;
 
         {Pid, persist, Key} ->
@@ -148,20 +164,20 @@ listener_loop(Ttl, CurrentKeys) ->
                     Handler ! {Pid, persist}
             end;
 
-        {keyDeleted} ->
-            listener_loop(Ttl, CurrentKeys - 1);
+        {keyDeleted, HandlerName} ->
+            listener_loop(Ttl, CurrentKeys - 1, lists:delete(HandlerName, Handlers));
 
         {getStats, Pid} ->
             Pid ! {ok, CurrentKeys};
 
         {shutdown, Pid} ->
-            io:format("TODO: Persist string~n"),
+            persists_all(Handlers),
             Pid ! ok;
             
         Error ->
             logging ! {add, self(), error, io_lib:format("Commad not recognise ~p~n", [Error])}
     end,
-    listener_loop(Ttl, CurrentKeys).
+    listener_loop(Ttl, CurrentKeys, Handlers).
 
 init(Config) ->
-    listener_loop(list_to_integer(dict:fetch("key_ttl", Config)), 0).
+    listener_loop(list_to_integer(dict:fetch("key_ttl", Config)), 0, []).

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import argparse, sys, re
+import argparse, sys, re, signal
 from brain import Brain
 
 __author__ = "Alonso Vidales"
@@ -106,8 +106,30 @@ class BrainConsole:
     }
 
     def __getHelp(self):
-        for action, attribs in self.__actions.items():
-            print attribs['desc']
+        print "\033[1mStrings : String values with persistance\033[0m"
+        print "get      - %s" % (self.__actions['get']['desc'])
+        print "set      - %s" % (self.__actions['set']['desc'])
+        print "pset     - %s" % (self.__actions['pset']['desc'])
+        print "del      - %s" % (self.__actions['del']['desc'])
+        print "pdel     - %s" % (self.__actions['pdel']['desc'])
+        print ""
+        print "\033[1mVolatile : String values without persistance\033[0m"
+        print "vget     - %s" % (self.__actions['vget']['desc'])
+        print "vset     - %s" % (self.__actions['vset']['desc'])
+        print "vdel     - %s" % (self.__actions['vdel']['desc'])
+        print ""
+        print "\033[1mHash : Hash values with persistance, each hash can contain one or more internal keys and each key a string associated\033[0m"
+        print "hget     - %s" % (self.__actions['hget']['desc'])
+        print "hsetkv   - %s" % (self.__actions['hsetkv']['desc'])
+        print "hpsetkv  - %s" % (self.__actions['hpsetkv']['desc'])
+        print "hdel     - %s" % (self.__actions['hdel']['desc'])
+        print "hpdel    - %s" % (self.__actions['hpdel']['desc'])
+        print ""
+        print "\033[1mSystem commands\033[0m"
+        print "info     - %s" % (self.__actions['info']['desc'])
+        print "shutdown - %s" % (self.__actions['shutdown']['desc'])
+        print "quit     - %s" % (self.__actions['quit']['desc'])
+        print ""
 
     def __printInfo(self, infoStr):
         try:
@@ -129,6 +151,12 @@ class BrainConsole:
             print "ERROR"
 
     def run(self):
+        def signal_handler(signal, frame):
+            print ""
+            sys.exit(0)
+
+        signal.signal(signal.SIGINT, signal_handler)
+
         try:
             self.__connection = Brain(
                 self.__args.host,
@@ -141,7 +169,7 @@ class BrainConsole:
 
         action = ''
         commandNumber = 1
-        while action != 'quit':
+        while action != 'quit' and action != 'shutdown':
             sys.stdout.write("%s > " % (commandNumber))
             commandNumber += 1
             action = raw_input()

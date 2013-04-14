@@ -11,7 +11,7 @@
 
 -export([
     init/1,
-    create_handler_from_warehouse/3]).
+    create_handler_from_warehouse/4]).
 
 convert_bin_to_string_kv([], Converted) ->
     Converted;
@@ -70,7 +70,7 @@ del_dict_keys([], Value) ->
 del_dict_keys([Key | Rest], Value) ->
     del_dict_keys(Rest, dict:erase(Key, Value)).
 
-handler_listener(Ttl, Key, Value) ->
+handler_listener(Ttl, Key, Value, HandlerName, Inactivity) ->
     receive
         {Pid, get, Key, IntKeys} ->
             case length(dict:fetch_keys(Value)) of
@@ -84,7 +84,7 @@ handler_listener(Ttl, Key, Value) ->
                             Pid ! {ok, {str, serialize_keys(IntKeys, Value)}}
                     end
             end,
-            handler_listener(Ttl, Key, Value);
+            handler_listener(Ttl, Key, Value, HandlerName, false);
 
         {Pid, set, IntKey, IntValue} ->
             % Return 0 if this is a new field, or 1 if the key has an assigned value
@@ -97,7 +97,7 @@ handler_listener(Ttl, Key, Value) ->
                 true ->
                     false
             end,
-            handler_listener(Ttl, Key, dict:store(IntKey, IntValue, Value));
+            handler_listener(Ttl, Key, dict:store(IntKey, IntValue, Value), HandlerName, false);
 
         {Pid, del, Key, IntKeys} ->
             if
@@ -112,7 +112,7 @@ handler_listener(Ttl, Key, Value) ->
                 true ->
                     false
             end,
-            handler_listener(Ttl, Key, NewValue);
+            handler_listener(Ttl, Key, NewValue, HandlerName, false);
 
         {Pid, persist} ->
             Result = warehouse_persist(Key, Value),
@@ -125,21 +125,27 @@ handler_listener(Ttl, Key, Value) ->
                     Pid ! {ok, 0}
             end,
 
-            handler_listener(Ttl, Key, Value);
+            handler_listener(Ttl, Key, Value, HandlerName, false);
 
         Error ->
             logging ! {add, self(), error, io_lib:format("Message not recognised ~p~n", [Error])}
 
         after Ttl ->
-            warehouse_persist(Key, Value),
-            hash_manager ! {keyDeleted},
-            logging ! {add, self(), info, io_lib:format("Key ~s persisted~n", [Key])}
+            case Inactivity of
+                false ->
+                    warehouse_persist(Key, Value),
+                    logging ! {add, self(), info, io_lib:format("Key ~s persisted~n", [Key])},
+                    handler_listener(Ttl, Key, Value, HandlerName, true);
+                true ->
+                    hash_manager ! {keyDeleted, HandlerName},
+                    logging ! {add, self(), info, io_lib:format("Key ~s removed from memory~n", [Key])}
+            end
     end.
 
-create_handler_from_warehouse(Pid, Ttl, Key) ->
+create_handler_from_warehouse(Pid, Ttl, Key, HandlerName) ->
     Value = warehouse_read(Key),
     Pid ! ok,
-    handler_listener(Ttl, Key, Value).
+    handler_listener(Ttl, Key, Value, HandlerName, false).
 
 get_handler_name(Key) ->
     list_to_atom(string:concat("hash_", Key)).
@@ -148,7 +154,18 @@ get_handler(Key) ->
     HandlerName = get_handler_name(Key),
     whereis(HandlerName).
 
-listener_loop(Ttl, CurrentKeys) ->
+persists_all([]) ->
+    true;
+
+persists_all([Pid | Rest]) ->
+    Pid ! {self(), persist},
+    receive
+        {ok, _Result} ->
+            true
+    end,
+    persists_all(Rest).
+
+listener_loop(Ttl, CurrentKeys, Handlers) ->
     receive
         {Pid, get, Key, [IntKeys]} ->
             case get_handler(Key) of
@@ -190,12 +207,12 @@ listener_loop(Ttl, CurrentKeys) ->
                     HandlerName = get_handler_name(Key),
                     register(
                         HandlerName,
-                        spawn(data_hash, create_handler_from_warehouse, [Pid, Ttl, Key]));
-                _YetDefined ->
-                    false
-            end,
+                        spawn(data_hash, create_handler_from_warehouse, [Pid, Ttl, Key, HandlerName])),
 
-            listener_loop(Ttl, CurrentKeys + 1);
+                    listener_loop(Ttl, CurrentKeys + 1, Handlers ++ [HandlerName]);
+                _YetDefined ->
+                    listener_loop(Ttl, CurrentKeys + 1, Handlers)
+            end;
 
         {Pid, persist, Key} ->
             case get_handler(Key) of
@@ -204,20 +221,20 @@ listener_loop(Ttl, CurrentKeys) ->
                     Handler ! {Pid, persist}
             end;
 
-        {keyDeleted} ->
-            listener_loop(Ttl, CurrentKeys - 1);
+        {keyDeleted, HandlerName} ->
+            listener_loop(Ttl, CurrentKeys - 1, lists:delete(HandlerName, Handlers));
 
         {getStats, Pid} ->
             Pid ! {ok, CurrentKeys};
 
         {shutdown, Pid} ->
-            io:format("TODO: Persist hash~n"),
+            persists_all(Handlers),
             Pid ! ok;
             
         Error ->
             logging ! {add, self(), error, io_lib:format("Commad not recognise ~p~n", [Error])}
     end,
-    listener_loop(Ttl, CurrentKeys).
+    listener_loop(Ttl, CurrentKeys, Handlers).
 
 init(Config) ->
-    listener_loop(list_to_integer(dict:fetch("key_ttl", Config)), 0).
+    listener_loop(list_to_integer(dict:fetch("key_ttl", Config)), 0, []).

@@ -98,6 +98,9 @@ class Brain:
     """
     Special queries to control some servers features
     """
+    def shutdown(self):
+        return self.__exec("shutdown")
+
     def info(self):
         return self.__exec("info").split('|')
 
