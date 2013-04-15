@@ -24,7 +24,7 @@ exec_action(Action, Pid, Host, Port, User, Pass, BaseDir, Key, Value) ->
                                 get ->
                                     case ftp:recv_bin(FtpPid, Key) of
                                         {ok, Content} ->
-                                            Pid ! {ok, Content};
+                                            Pid ! {ok, binary:bin_to_list(Content)};
                                         {error, _Reason} ->
                                             Pid ! ko
                                     end;
