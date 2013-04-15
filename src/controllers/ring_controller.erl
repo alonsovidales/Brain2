@@ -53,14 +53,19 @@ get_left_right_nodes(NodeId, NodesList) ->
     end,
     Nodes.
 
-listener_loop(NodeId, LeftNode, RightNode) ->
+listener_loop(NodeId, LeftNode, RightNode, Nodes) ->
     receive
         {get, right, Pid} ->
             Pid ! {ok, RightNode},
-            listener_loop(NodeId, LeftNode, RightNode);
+            listener_loop(NodeId, LeftNode, RightNode, Nodes);
         {get, left, Pid} ->
             Pid ! {ok, LeftNode},
-            listener_loop(NodeId, LeftNode, RightNode);
+            listener_loop(NodeId, LeftNode, RightNode, Nodes);
+
+        {getHashPosByKey, Key, Pid} ->
+            {_NodeId, NodePid} = lists:nth((erlang:crc32(Key) rem length(Nodes)) + 1, Nodes),
+            Pid ! NodePid,
+            listener_loop(NodeId, LeftNode, RightNode, Nodes);
 
         % NodesList is a list of {<nodeId>, <Pid>} for each node
         {update, NodesList} ->
@@ -68,11 +73,11 @@ listener_loop(NodeId, LeftNode, RightNode) ->
 
             logging ! {add, self(), debug, io_lib:format("Nodes List: ~p ~n", [NodesList])},
             logging ! {add, self(), info, io_lib:format("Updating partner nodes Left: ~p Right: ~p ~n", [NewLeftNode, NewRightNode])},
-            listener_loop(NodeId, NewLeftNode, NewRightNode);
+            listener_loop(NodeId, NewLeftNode, NewRightNode, NodesList);
 
         {status, Pid} ->
             Pid ! ok,
-            listener_loop(NodeId, LeftNode, RightNode);
+            listener_loop(NodeId, LeftNode, RightNode, Nodes);
 
         {monitor, Pid} ->
             {Total, Allocated, Worst} = memsup:get_memory_data(),
@@ -81,7 +86,7 @@ listener_loop(NodeId, LeftNode, RightNode) ->
                 Stats ->
                     Pid ! {Total, Allocated, Worst, Stats}
             end,
-            listener_loop(NodeId, LeftNode, RightNode);
+            listener_loop(NodeId, LeftNode, RightNode, Nodes);
 
         {removeNode, Pid} ->
             logging ! {add, self(), info, io_lib:format("Ring Manager stopped~n", [])},
@@ -132,4 +137,4 @@ init(Config, NodeId) ->
     % Register this node on all the available managers
     register_node(ManagersPids, NodeId),
 
-    listener_loop(NodeId, whereis(data_controller), whereis(data_controller)).
+    listener_loop(NodeId, whereis(data_controller), whereis(data_controller), []).

@@ -209,7 +209,7 @@ listener_loop(Ttl, CurrentKeys, Handlers) ->
                         HandlerName,
                         spawn(data_hash, create_handler_from_warehouse, [Pid, Ttl, Key, HandlerName])),
 
-                    listener_loop(Ttl, CurrentKeys + 1, Handlers ++ [HandlerName]);
+                    listener_loop(Ttl, CurrentKeys + 1, sets:add_element(HandlerName, Handlers));
                 _YetDefined ->
                     listener_loop(Ttl, CurrentKeys + 1, Handlers)
             end;
@@ -222,13 +222,13 @@ listener_loop(Ttl, CurrentKeys, Handlers) ->
             end;
 
         {keyDeleted, HandlerName} ->
-            listener_loop(Ttl, CurrentKeys - 1, lists:delete(HandlerName, Handlers));
+            listener_loop(Ttl, CurrentKeys - 1, sets:del_element(HandlerName, Handlers));
 
         {getStats, Pid} ->
             Pid ! {ok, CurrentKeys};
 
         {shutdown, Pid} ->
-            persists_all(Handlers),
+            persists_all(sets:to_list(Handlers)),
             Pid ! ok;
             
         Error ->
@@ -237,4 +237,4 @@ listener_loop(Ttl, CurrentKeys, Handlers) ->
     listener_loop(Ttl, CurrentKeys, Handlers).
 
 init(Config) ->
-    listener_loop(list_to_integer(dict:fetch("key_ttl", Config)), 0, []).
+    listener_loop(list_to_integer(dict:fetch("key_ttl", Config)), 0, sets:new()).

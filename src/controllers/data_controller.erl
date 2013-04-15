@@ -22,14 +22,30 @@ action_executor(Action, Handler, Key, Params, NodeId, PidToConfirm, RingComplete
     % to do the action against the loaded data
     if 
         RingComplete ->
-            Handler ! {self(), load, Key, Action == set},
-
+            % Check if you are the only one locking for this data key, in case of don't be, check againg the ring
+            ringManager ! {getHashPosByKey, Key, self()},
             receive
-                ko ->
-                    throw(io_lib:format("Problem trying to load key ~s from Warehouse~n", [Key]));
-                ok ->
-                    logging ! {add, self(), info, io_lib:format("Loaded key ~s from Warehouse~n", [Key])}
+                NodeAcqPid ->
+                    NodeAcqPid ! {self(), acquireHandler, Key},
+
+                    % Ok, we are the only one asking fot this key, load it from the warehouse
+                    receive
+                        ok ->
+                            Handler ! {self(), load, Key, Action == set},
+
+                            receive
+                                ko ->
+                                    throw(io_lib:format("Problem trying to load key ~s from Warehouse~n", [Key]));
+                                ok ->
+                                    logging ! {add, self(), info, io_lib:format("Loaded key ~s from Warehouse~n", [Key])}
+                            end;
+                            
+                        ko ->
+                            false
+                    end,
+                    NodeAcqPid ! {releaseHandler, Key}
             end;
+
         true ->
             false
     end,
@@ -53,9 +69,9 @@ action_executor(Action, Handler, Key, Params, NodeId, PidToConfirm, RingComplete
                     % Execute the action on the right node
                     NodePid ! {ie, NodeId, Action, Handler, Key, Params, PidToConfirm};
                 _NoNode ->
-                    logging ! {add, self(), info, io_lib:format("No node at the right~n")}
+                    logging ! {add, self(), info, io_lib:format("No node at the right~n", [])}
                 after 100 ->
-                    logging ! {add, self(), error, io_lib:format("Ring manager doesn't respond~n")}
+                    logging ! {add, self(), error, io_lib:format("Ring manager doesn't respond~n", [])}
             end;
 
         % The data was found, return the result to the server
@@ -67,7 +83,7 @@ action_executor(Action, Handler, Key, Params, NodeId, PidToConfirm, RingComplete
 %% This method will listen for incomming messages from the client, and on a new process will attend them
 %% Acts as an adapter of the different data type managers.
 %%
-listener_loop(NodeId, LastSecOps, OpsSec, Timestamp) ->
+listener_loop(NodeId, LastSecOps, OpsSec, Timestamp, LockedHandlers) ->
     % Used to get stats of ops / sec, etc
     {_Mega, TimestampSec, _Micro} = now(),
     if
@@ -197,6 +213,22 @@ listener_loop(NodeId, LastSecOps, OpsSec, Timestamp) ->
                 action_executor,
                 [del, hash_manager, Key, [true, string:tokens(IntKeys, " ")], NodeId, Pid, false]);
 
+        % Used as traffic light in order to avoid possible duplicated datas on different ring nodes
+        {Pid, acquireHandler, HandlerName} ->
+            case sets:is_element(HandlerName, LockedHandlers) of
+                true ->
+                    Pid ! ko,
+                    logging ! {add, self(), debug, io_lib:format("Key ~p yet acquired by another node~n", [HandlerName])};
+                false ->
+                    Pid ! ok,
+                    logging ! {add, self(), debug, io_lib:format("Key ~p acquired~n", [HandlerName])},
+                    listener_loop(NodeId, NewLastSecOps, NowOpsSec, TimestampSec, sets:add_element(HandlerName, LockedHandlers))
+            end;
+
+        {releaseHandler, HandlerName} ->
+            logging ! {add, self(), debug, io_lib:format("Key ~p released~n", [HandlerName])},
+            listener_loop(NodeId, NewLastSecOps, NowOpsSec, TimestampSec, sets:del_element(HandlerName, LockedHandlers));
+
         {checkAlive, Pid} ->
             Pid ! ok;
 
@@ -252,7 +284,7 @@ listener_loop(NodeId, LastSecOps, OpsSec, Timestamp) ->
             logging ! {add, self(), error, io_lib:format("Commad not recognise~p~n", [Error])}
     end,
 
-    listener_loop(NodeId, NewLastSecOps, NowOpsSec, TimestampSec).
+    listener_loop(NodeId, NewLastSecOps, NowOpsSec, TimestampSec, LockedHandlers).
 
 init(Config, NodeId) ->
     register(
@@ -271,4 +303,5 @@ init(Config, NodeId) ->
         NodeId,
         0,
         0,
-        0).
+        0,
+        sets:new()).
