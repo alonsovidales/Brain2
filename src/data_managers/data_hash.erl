@@ -52,10 +52,10 @@ warehouse_persist(Key, Value) ->
     case length(dict:fetch_keys(Value)) of
         0 ->
             warehouse ! {self(), del, io_lib:format("hash_~s", [Key])},
-            logging ! {add, self(), info, io_lib:format("Deleting key: ~s~n", [Key])};
+            logging ! {add, self(), debug, io_lib:format("Deleting key: ~s~n", [Key])};
         _Store ->
             warehouse ! {self(), save, io_lib:format("hash_~s", [Key]), serialize(Value)},
-            logging ! {add, self(), info, io_lib:format("Persisting key: ~s Value: ~p~n", [Key, Value])}
+            logging ! {add, self(), debug, io_lib:format("Persisting key: ~s Value: ~p~n", [Key, Value])}
     end,
 
     receive
@@ -118,7 +118,7 @@ handler_listener(Ttl, Key, Value, HandlerName, Inactivity) ->
             Result = warehouse_persist(Key, Value),
             case Result of
                 ok ->
-                    logging ! {add, self(), info, io_lib:format("key persisted: ~s, ~p~n", [Key, {ok, 1}])},
+                    logging ! {add, self(), debug, io_lib:format("key persisted: ~s, ~p~n", [Key, {ok, 1}])},
                     Pid ! {ok, 1};
                 ko -> 
                     logging ! {add, self(), error, io_lib:format("Problem trying to persist the key ~s~n", [Key])},
@@ -134,11 +134,11 @@ handler_listener(Ttl, Key, Value, HandlerName, Inactivity) ->
             case Inactivity of
                 false ->
                     warehouse_persist(Key, Value),
-                    logging ! {add, self(), info, io_lib:format("Key ~s persisted~n", [Key])},
+                    logging ! {add, self(), debug, io_lib:format("Key ~s persisted~n", [Key])},
                     handler_listener(Ttl, Key, Value, HandlerName, true);
                 true ->
                     hash_manager ! {keyDeleted, HandlerName},
-                    logging ! {add, self(), info, io_lib:format("Key ~s removed from memory~n", [Key])}
+                    logging ! {add, self(), debug, io_lib:format("Key ~s removed from memory~n", [Key])}
             end
     end.
 
