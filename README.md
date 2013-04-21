@@ -6,7 +6,7 @@ Brain stores the datas on the memory of the node who has request it, but another
 
 The classical arquitecture for a hight performance, and high availability system is:
 
-![ScreenShot](https://raw.github.com/alonsovidales/Brain2/master/doc/imgs/classic_deployment_schema.png)
+->![ScreenShot](https://raw.github.com/alonsovidales/Brain2/master/doc/imgs/classic_deployment_schema.png)<-
 
 We have the redundant database servers + cache servers + front servers, keep all the information on the database servers idexed and ready to be accessed if too expensive, and needs an important waste of resources on maintance, redudance, etc, use a cache is expensive too. Scale the database is a very heavy task.
 
