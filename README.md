@@ -12,6 +12,7 @@ The classical architecture for a high performance and high availability system u
 We have the redundant database servers + cache servers + front servers. Keep all the information on the database servers indexed and ready to be accessed if too expensive, and needs an important waste of resources on maintance, redudance, etc. The action of scale the database is a very heavy and complex task.
 
 Brain is designed for applications like video games, e-commerce, etc where the system do a heavy usage of some records on a specific period of time (user information, etc), and after this period, the records keeps inactive for a long period of time, then is not necessary to store them on memory, or keep them on a hight performance storage system (Databases, etc), we can store them on a cheap storage system.
+
 For example, for a video game, a user access to the game, the system loads all the information, and for the period of time who the user are playing, the system need to read / update a lot of times this records, but when the player is not playing, the datas can be stored:
 
 <p align="center">
