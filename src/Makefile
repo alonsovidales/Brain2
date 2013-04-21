@@ -36,6 +36,8 @@ install:
 	@echo " Use brain-server to launch a brain node instance"
 	@echo "*************************************************************************************************"
 
+all: install
+
 clean:
 	@rm $(INSTALL_BIN)brain-manager
 	@rm $(INSTALL_BIN)brain-server
