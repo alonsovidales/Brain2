@@ -1,17 +1,18 @@
 Brain is an on memory active cache system, distributed, and highly parallelizable. Brain is able to read from unexpensive storage systems like Amazon S3, or an FTP, keep in memory the information, and after a specified period of inactivity dump the data to the storage system again.
-Brain stores the data on the memory of the node who has request it, but another node can access to the data in a transparent way for the client, doesn't matters if the data is on the memory of the local node, or in any other node of the system.
+Brain stores the data on the memory of the node who made the request it, but another node can access to the data in a transparent way for the client, doesn't matters if the data is on the memory of the local node, or in any other node of the system, is a distributed-memory system.
 
 ## Deployment specifications
 
-The classical arquitecture for a hight performance, and high availability system use to be:
+The classical architecture for a high performance and high availability system use to be:
 
 <p align="center">
     <img src="https://raw.github.com/alonsovidales/Brain2/master/doc/imgs/classic_deployment_schema.png" height="350" />
 </p>
 
-We have the redundant database servers + cache servers + front servers, keep all the information on the database servers idexed and ready to be accessed if too expensive, and needs an important waste of resources on maintance, redudance, etc, use a cache is expensive too. Scale the database is a very heavy task.
+We have the redundant database servers + cache servers + front servers. Keep all the information on the database servers indexed and ready to be accessed if too expensive, and needs an important waste of resources on maintance, redudance, etc. The action of scale the database is a very heavy and complex task.
 
-Brain is designed for some applications like video games, e-commerce, etc where the requests for a user along the time looks like:
+Brain is designed for applications like video games, e-commerce, etc where the system do a heavy usage of some records on a specific period of time (user information, etc), and after this period, the records keeps inactive for a long period of time, then is not necessary to store them on memory, or keep them on a hight performance storage system (Databases, etc), we can store them on a cheap storage system.
+For example, for a video game, a user access to the game, the system loads all the information, and for the period of time who the user are playing, the system need to read / update a lot of times this records, but when the player is not playing, the datas can be stored:
 
 <p align="center">
     <img src="https://raw.github.com/alonsovidales/Brain2/master/doc/imgs/requests_time.png" height="100" />
