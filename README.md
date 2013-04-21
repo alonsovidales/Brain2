@@ -17,11 +17,13 @@ Brain is designed for some applications like video games, e-commerce, etc where 
 The users use to keep a lot of time inactive but when they are using the application, they do a lot of requests to the database in a short period of time to read and moify the information stored. For example in a vide game, the users use to play some hours, and keep inactive the rest of the day, this is the perfet application for Brain.
 
 Now, let's check the CPU / Memory ussage on the front servers for a classic schema:
+
 ![ScreenShot](https://raw.github.com/alonsovidales/Brain2/master/doc/imgs/front_servers_memory_cpu.png)
 
 The front servers uses a lot of CPU in order to process all the information and create the output for the clients be the memory is underussed.
 
 Brain is designed to work keeping the information of the active users on the memory of the front servers, obtaining a better ussage of the resources:
+
 ![ScreenShot](https://raw.github.com/alonsovidales/Brain2/master/doc/imgs/front_servers_memory_cpu_with_brain.png)
 
 The ussage of the memory is increased, keeping the information of the active users for this node, and the CPU usage have a reduction, this is because of we don't need to use the network, create complex SQL calls to get the datas, etc, the most important par of the queries are local queries.
