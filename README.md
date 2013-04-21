@@ -60,9 +60,9 @@ Brain is designed for Linux OS. Before compile or install Brain, is necessary to
 In order to install Brain, just execute "make" or "make install" as super user. This will compile all the erlang code, and create the beam files into the /usr/local/brain/ directory.
 
 The executable files will be located into the /usr/local/bin/ directory:
-    - brain-console.py : Used to connect and interact with one of the nodes
-    - brain-manager : Launch the manager system in backplain
-    - brain-server : Launch the local server node
+ - brain-console.py : Used to connect and interact with one of the nodes
+ - brain-manager : Launch the manager system in backplain
+ - brain-server : Launch the local server node
 
 The installation will install the [Brain Python libraries](https://github.com/alonsovidales/Brain2/tree/master/libs/python/brain).
 
