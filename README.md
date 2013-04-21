@@ -1,10 +1,9 @@
-# Brain
 Brain is an on memory active cache system, distributed, and hightly pararelizabled. Brain is able to read from unexpensive storage systems like Amazon S3, or an FTP, keep in memory the information, and after a specified period of inactivity dump the datas to the storage system again.
 Brain stores the datas on the memory of the node who has request it, but another node can access to the data in a transparent way for the client, doesn't matters if the data is on the memory of the local node, or in any other node of the system.
 
 ## What is Brain, and for whom ussage is Brain recomended
 
-The classical arquitecture for a hight performance, and high availability system is:
+The classical arquitecture for a hight performance, and high availability system use to be:
 
 <p align="center">
     <img src="https://raw.github.com/alonsovidales/Brain2/master/doc/imgs/classic_deployment_schema.png" height="350" />
