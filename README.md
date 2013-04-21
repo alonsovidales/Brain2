@@ -67,3 +67,14 @@ The executable files will be located into the /usr/local/bin/ directory:
 The installation will install the [Brain Python libraries](https://github.com/alonsovidales/Brain2/tree/master/libs/python/brain).
 
 Check the configuration section after install the system
+
+### Configuration
+
+Brain searchs for the config file at the next locations:
+ - /etc/brain_node.conf
+ - /etc/brain/brain_node.conf
+ - etc/brain_node.conf
+
+ The last of the paths are the current path where the system is executed.
+
+
