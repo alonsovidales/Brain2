@@ -7,14 +7,17 @@ Brain stores the datas on the memory of the node who has request it, but another
 The classical arquitecture for a hight performance, and high availability system is:
 
 <p align="center">
-    <img src="https://raw.github.com/alonsovidales/Brain2/master/doc/imgs/classic_deployment_schema.png" height="400" />
+    <img src="https://raw.github.com/alonsovidales/Brain2/master/doc/imgs/classic_deployment_schema.png" height="350" />
 </p>
 
 We have the redundant database servers + cache servers + front servers, keep all the information on the database servers idexed and ready to be accessed if too expensive, and needs an important waste of resources on maintance, redudance, etc, use a cache is expensive too. Scale the database is a very heavy task.
 
 Brain is designed for some applications like video games, e-commerce, etc where the requests for a user along the time looks like:
 
-![ScreenShot](https://raw.github.com/alonsovidales/Brain2/master/doc/imgs/requests_time.png)
+<p align="center">
+    <img src="https://raw.github.com/alonsovidales/Brain2/master/doc/imgs/requests_time.png" height="100" />
+</p>
+
 
 The users use to keep a lot of time inactive but when they are using the application, they do a lot of requests to the database in a short period of time to read and moify the information stored. For example in a vide game, the users use to play some hours, and keep inactive the rest of the day, this is the perfet application for Brain.
 
