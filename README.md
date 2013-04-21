@@ -46,3 +46,24 @@ We can replace the database servers by an inexpensive storage system like Amazon
 Is important to note that a "Sticky" load balancer is the best choice in order to obtain a better performance, the information of the user will be stored on the local memory of the front server assigned to the user.
 
 One of the most important features of this architecture, is that the cost of this architecture is directly related to the number of active users, and can scale really fast, on a classic schema the costs are related to the number of data stored.
+
+## Building and Installing Brain
+
+### Prerequisites
+
+Brain is designed for Linux OS. Before compile or install Brain, is necessary to have installed before:
+ - Erlang : V5.8.5 or better
+ - Python : V2.7.3 or better
+
+### Installation
+
+In order to install Brain, just execute "make" or "make install" as super user. This will compile all the erlang code, and create the beam files into the /usr/local/brain/ directory.
+
+The executable files will be located into the /usr/local/bin/ directory:
+    - brain-console.py : Used to connect and interact with one of the nodes
+    - brain-manager : Launch the manager system in backplain
+    - brain-server : Launch the local server node
+
+The installation will install the [Brain Python libraries](https://github.com/alonsovidales/Brain2/tree/master/libs/python/brain).
+
+Check the configuration section after install the system
