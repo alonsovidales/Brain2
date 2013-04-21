@@ -3,9 +3,9 @@
 default: all
 
 .DEFAULT:
-    cd src && $(MAKE) $@
+	cd src && $(MAKE) $@
 
 install:
-        cd src && $(MAKE) $@
+	cd src && $(MAKE) $@
 
 .PHONY: install
