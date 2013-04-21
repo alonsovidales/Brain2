@@ -75,6 +75,6 @@ Brain searchs for the config file at the next locations:
  - /etc/brain/brain_node.conf
  - etc/brain_node.conf
 
- The last of the paths are the current path where the system is executed.
+The last of the paths are the current path where the system is executed.
 
 
