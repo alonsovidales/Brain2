@@ -68,13 +68,37 @@ The installation will install the [Brain Python libraries](https://github.com/al
 
 Check the configuration section after install the system
 
+This is an Erlang based system, and uses the Erlang messages system, in order to allow the communication between nodes, the content of the ".erlang.cookie" at the home of the user who execute the server, or the managers, should to be the same on all the instances.
+
+Check: http://www.erlang.org/doc/getting_started/conc_prog.html#id67450
+
 ### Configuration
 
 Brain searchs for the config file at the next locations:
  - /etc/brain_node.conf
  - /etc/brain/brain_node.conf
- - etc/brain_node.conf
+ - etc/brain_node.conf -> Search on the current path where the system is executed.
 
-The last of the paths are the current path where the system is executed.
+In order to configure the system, just copy the etc/brain_node.conf to the /etc/ system directory, and edit it, the file includes comments about what the parameters do.
 
+## The managers
 
+The system needs some manager instances in order to control all the available node instances on the ring, check the health of each one, and keep updated the list of available instances on all the nodes.
+
+At least one "manager" instance is necessary in order to use the distributed memory strategy, you can specify one or more on the config variable "manager_servers" using a coma separated list.
+
+If one of the manager servers fails, the rest of servers can still control the ring, is a redundant system without primary or slave servers.
+
+## Brain console
+
+Brain includes a console that help you to interact with the servers work with the data, check the status of the node shutdown it, etc.
+
+By default the console will try to connect to the local node on the port 3697, if you want to see the different configuration parameters use:
+
+brain-console.py --help
+  
+After open the console, use the "?" character to see all the available options:
+
+<p align="center">
+    <img src="https://raw.github.com/alonsovidales/Brain2/master/doc/imgs/brain_console_help.png" height="450" />
+</p>
