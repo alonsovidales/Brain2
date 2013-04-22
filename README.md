@@ -3,7 +3,7 @@ Brain stores the data on the memory of the node who made the request it, but ano
 
 ## Overview and deployment specifications
 
-The classical architecture for a high performance and high availability system use to be:
+The classical architecture for a high performance and high availability system without Brain use to be:
 
 <p align="center">
     <img src="https://raw.github.com/alonsovidales/Brain2/master/doc/imgs/classic_deployment_schema.png" height="350" />
