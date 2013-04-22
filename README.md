@@ -1,4 +1,4 @@
-Brain is an on memory active cache system, distributed, and highly parallelizable. Brain is able to read from unexpensive storage systems like Amazon S3, or an FTP, keep in memory the information, and after a specified period of inactivity dump the data to the storage system again.
+Brain is an on memory active cache system, distributed, and highly parallelizable. Brain is able to read from inexpensive storage systems like Amazon S3, or an FTP, keep in memory the information, and after a specified period of inactivity dump the data to the storage system again.
 Brain stores the data on the memory of the node who made the request it, but another node can access to the data in a transparent way for the client, doesn't matters if the data is on the memory of the local node, or in any other node of the system, is a distributed-memory system.
 
 ## Overview and deployment specifications
