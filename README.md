@@ -68,7 +68,7 @@ The installation will install the [Brain Python libraries](https://github.com/al
 
 Check the configuration section after install the system
 
-This is an Erlang based system, and uses the Erlang messages system, in order to allow the communication between nodes, the content of the ".erlang.cookie" at the home of the user who execute the server, or the managers, should to be the same on all the instances.
+In order to allow the communication between nodes, the value of the parameter "secret" on the config file should to be the same on all the nodes and managers.
 
 Check: http://www.erlang.org/doc/getting_started/conc_prog.html#id67450
 

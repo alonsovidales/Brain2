@@ -41,7 +41,7 @@ class BrainConsole:
         'vget': {
             'params': 0,
             'result': 'str',
-            'desc': "get <key> : Set the value into a key. This kind of keys are not persisted into the warehouse."
+            'desc': "get <key> : Get the value into a key. This kind of keys are not persisted into the warehouse."
         },
         'vset': {
             'params': 1,

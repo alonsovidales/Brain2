@@ -33,6 +33,8 @@ get_config(Verbose) ->
 
 start_node() ->
     Config = get_config(init:get_argument(verbose)),
+    io:format("SECRET: ~s~n", [dict:fetch("secret", Config)]),
+    erlang:set_cookie(node(), list_to_atom(dict:fetch("secret", Config))),
 
     case init:get_argument(node_id) of
         {ok, [[NodeId]]} ->
@@ -66,6 +68,8 @@ start_node() ->
 
 start_manager() ->
     Config = get_config(init:get_argument(verbose)),
+    erlang:set_cookie(node(), list_to_atom(dict:fetch("secret", Config))),
+
     register(
         logging,
         spawn_link(logging, init, [Config, <<"manager">>])),
