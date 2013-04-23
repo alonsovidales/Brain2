@@ -100,5 +100,5 @@ brain-console.py --help
 After open the console, use the "?" character to see all the available options:
 
 <p align="center">
-    <img src="https://raw.github.com/alonsovidales/Brain2/master/doc/imgs/brain_console_help.png" height="450" />
+    <img src="https://raw.github.com/alonsovidales/Brain2/master/doc/imgs/brain_console_help.png" />
 </p>
